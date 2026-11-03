@@ -1,0 +1,132 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - heading "Agent Token ViewerLOCAL" [level=1] [ref=f1e5]
+      - paragraph [ref=f1e6]: 次の作業を、どのエージェントで。
+    - generic [ref=f1e7]:
+      - button "残量を表示" [active] [ref=f1e255] [cursor=pointer]
+      - button "ライトモード（押すとダークモード）" [ref=f1e252] [cursor=pointer]
+  - generic [ref=f1e12]:
+    - generic [ref=f1e13]: 開いている間だけ3分ごとに取得
+    - generic [ref=f1e15]:
+      - generic [ref=f1e16]: 起動時の更新中…
+      - button "更新" [ref=f1e129] [cursor=pointer]
+  - region "サービス別の利用状況" [ref=f1e18]:
+    - article [ref=f1e256]:
+      - generic [ref=f1e257]:
+        - heading "Codex" [level=2] [ref=f1e261]
+        - generic [ref=f1e262]: plus
+      - generic [ref=f1e263]:
+        - generic [ref=f1e264]: 5時間枠
+        - generic [ref=f1e265]:
+          - generic [ref=f1e266]: "0"
+          - generic [ref=f1e267]: "%"
+          - generic [ref=f1e268]: 使用
+        - meter "5時間枠の使用量" [ref=f1e269]
+        - paragraph [ref=f1e270]: 残り 100%
+        - generic [ref=f1e271]:
+          - generic [ref=f1e272]: リセット 11/4 01:38
+          - strong [ref=f1e273]: あと4時間24分
+      - generic [ref=f1e274]:
+        - generic [ref=f1e275]: 週間枠
+        - generic [ref=f1e276]:
+          - generic [ref=f1e277]: "5"
+          - generic [ref=f1e278]: "%"
+          - generic [ref=f1e279]: 使用
+        - meter "週間枠の使用量" [ref=f1e280]
+        - paragraph [ref=f1e282]: 残り 95%
+        - generic [ref=f1e283]:
+          - generic [ref=f1e284]: リセット 11/10 10:20
+          - strong [ref=f1e285]: あと6日13時間
+      - generic [ref=f1e286]:
+        - generic "2026/11/3 21:14:43" [ref=f1e287]: 最終取得 たった今 · 公式 App Server
+        - link "利用状況 ↗" [ref=f1e288] [cursor=pointer]:
+          - /url: https://chatgpt.com/codex/settings/usage
+    - article [ref=f1e289]:
+      - generic [ref=f1e290]:
+        - heading "Claude" [level=2] [ref=f1e294]
+        - generic [ref=f1e295]: pro
+      - generic [ref=f1e296]:
+        - generic [ref=f1e297]: 5時間枠
+        - generic [ref=f1e298]:
+          - generic [ref=f1e299]: "7"
+          - generic [ref=f1e300]: "%"
+          - generic [ref=f1e301]: 使用
+        - meter "5時間枠の使用量" [ref=f1e302]
+        - paragraph [ref=f1e304]: 残り 93%
+        - generic [ref=f1e305]:
+          - generic [ref=f1e306]: リセット 11/4 01:40
+          - strong [ref=f1e307]: あと4時間26分
+      - generic [ref=f1e308]:
+        - generic [ref=f1e309]: 週間枠
+        - generic [ref=f1e310]:
+          - generic [ref=f1e311]: "9"
+          - generic [ref=f1e312]: "%"
+          - generic [ref=f1e313]: 使用
+        - meter "週間枠の使用量" [ref=f1e314]
+        - paragraph [ref=f1e316]: 残り 91%
+        - generic [ref=f1e317]:
+          - generic [ref=f1e318]: リセット 11/8 04:00
+          - strong [ref=f1e319]: あと4日6時間
+      - generic [ref=f1e320]:
+        - generic "2026/11/3 21:12:55" [ref=f1e321]: 最終取得 1分前 · Web 利用状況
+        - link "利用状況 ↗" [ref=f1e322] [cursor=pointer]:
+          - /url: https://claude.ai/settings/usage
+    - article [ref=f1e323]:
+      - generic [ref=f1e324]:
+        - heading "Cursor" [level=2] [ref=f1e328]
+        - generic [ref=f1e329]: pro
+      - generic [ref=f1e330]:
+        - generic [ref=f1e331]: 全体
+        - generic [ref=f1e332]:
+          - generic [ref=f1e333]: "30"
+          - generic [ref=f1e334]: "%"
+          - generic [ref=f1e335]: 使用
+        - meter "全体の使用量" [ref=f1e336]
+        - paragraph [ref=f1e338]: 残り 70%
+        - generic [ref=f1e339]:
+          - generic [ref=f1e340]: 請求期間終了 11/7 14:11
+          - strong [ref=f1e341]: あと3日16時間
+      - generic [ref=f1e342]:
+        - generic [ref=f1e343]: Other Models
+        - generic [ref=f1e344]:
+          - generic [ref=f1e345]: "63"
+          - generic [ref=f1e346]: "%"
+          - generic [ref=f1e347]: 使用
+        - meter "Other Modelsの使用量" [ref=f1e348]
+        - paragraph [ref=f1e350]: 残り 37%
+        - generic [ref=f1e351]:
+          - generic [ref=f1e352]: 請求期間終了 11/7 14:11
+          - strong [ref=f1e353]: あと3日16時間
+      - paragraph [ref=f1e354]: 追加の従量課金が有効です。上限到達後も課金して継続する場合があります。
+      - generic [ref=f1e355]:
+        - generic "2026/11/3 21:12:54" [ref=f1e356]: 最終取得 1分前 · Web 利用状況
+        - link "利用状況 ↗" [ref=f1e357] [cursor=pointer]:
+          - /url: https://cursor.com/dashboard/spending
+  - paragraph [ref=f1e121]: 余裕あり 使用50%以上 使用75%以上
+  - group [ref=f1e125]:
+    - generic "ブラウザー連携・初回セットアップ 拡張未接続" [ref=f1e233] [cursor=pointer]:
+      - text: ブラウザー連携・初回セットアップ
+      - generic [ref=f1e127]: 拡張未接続
+    - generic [ref=f1e234]:
+      - paragraph [ref=f1e235]: CursorとClaudeは、ログイン済みブラウザーの拡張から利用状況のみを受け取ります。Cookieや認証トークンはこのアプリへ送信しません。
+      - list [ref=f1e236]:
+        - listitem [ref=f1e237]:
+          - text: Edgeの
+          - code [ref=f1e238]: edge://extensions
+          - text: でデベロッパーモードを有効にします。
+        - listitem [ref=f1e239]:
+          - text: 「パッケージ化されていない拡張機能を読み込む」で次のフォルダーを選びます。
+          - generic [ref=f1e240]: C:\src\agent-token-viewer\extension
+          - button "フォルダーのパスをコピー" [ref=f1e241] [cursor=pointer]
+        - listitem [ref=f1e242]:
+          - text: プロジェクトの
+          - code [ref=f1e243]: install-edge.cmd
+          - text: を初回だけ実行します。
+        - listitem [ref=f1e244]: 拡張を再読み込みし、アイコンをクリックするとアプリとメーターが起動します。最後のメータータブを閉じると取得と裏のアプリが停止します。
+      - generic [ref=f1e245]:
+        - link "Cursorにログイン ↗" [ref=f1e246] [cursor=pointer]:
+          - /url: https://cursor.com/dashboard/spending
+        - link "Claudeにログイン ↗" [ref=f1e247] [cursor=pointer]:
+          - /url: https://claude.ai/settings/usage
+      - paragraph [ref=f1e248]: T3のプレビューと普段のChrome・Edgeのログイン状態は別です。拡張を入れたブラウザーでログインしてください。公式Claude Code出力の補助連携はREADMEを参照してください。

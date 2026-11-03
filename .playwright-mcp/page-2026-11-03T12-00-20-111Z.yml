@@ -1,0 +1,112 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Agent Token ViewerLOCAL" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 次の作業を、どのエージェントで。
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - button "⚙ 設定" [expanded] [active] [ref=e9] [cursor=pointer]
+        - generic [ref=e125]:
+          - 'button "表示: 使用量" [ref=e126] [cursor=pointer]'
+          - 'button "テーマ: ライト" [ref=e127] [cursor=pointer]'
+      - button "更新中…" [disabled] [ref=e10]
+  - generic [ref=e11]:
+    - generic [ref=e12]: 開いている間だけ3分ごとに取得
+    - generic [ref=e14]: 更新中…
+  - region "サービス別の利用状況" [ref=e15]:
+    - article [ref=e16]:
+      - generic [ref=e17]:
+        - heading "Codex" [level=2] [ref=e21]
+        - generic [ref=e22]: plus
+      - generic [ref=e23]:
+        - generic [ref=e24]: 5時間枠
+        - generic [ref=e25]:
+          - generic [ref=e26]: "0"
+          - generic [ref=e27]: "%"
+          - generic [ref=e28]: 使用
+        - meter "5時間枠の使用量" [ref=e29]
+        - paragraph [ref=e30]: 残り 100%
+        - generic [ref=e31]:
+          - generic [ref=e32]: リセット 11/4 01:38
+          - strong [ref=e33]: あと4時間38分
+      - generic [ref=e34]:
+        - generic [ref=e35]: 週間枠
+        - generic [ref=e36]:
+          - generic [ref=e37]: "5"
+          - generic [ref=e38]: "%"
+          - generic [ref=e39]: 使用
+        - meter "週間枠の使用量" [ref=e40]
+        - paragraph [ref=e42]: 残り 95%
+        - generic [ref=e43]:
+          - generic [ref=e44]: リセット 11/10 10:20
+          - strong [ref=e45]: あと6日13時間
+      - generic [ref=e46]:
+        - generic "2026/11/3 20:58:15" [ref=e47]: 最終取得 2分前 · 公式 App Server
+        - link "利用状況 ↗" [ref=e48] [cursor=pointer]:
+          - /url: https://chatgpt.com/codex/settings/usage
+    - article [ref=e49]:
+      - generic [ref=e50]:
+        - heading "Claude" [level=2] [ref=e54]
+        - generic [ref=e55]: pro
+      - generic [ref=e56]:
+        - generic [ref=e57]: 5時間枠
+        - generic [ref=e58]:
+          - generic [ref=e59]: "4"
+          - generic [ref=e60]: "%"
+          - generic [ref=e61]: 使用
+        - meter "5時間枠の使用量" [ref=e62]
+        - paragraph [ref=e64]: 残り 96%
+        - generic [ref=e65]:
+          - generic [ref=e66]: リセット 11/4 01:40
+          - strong [ref=e67]: あと4時間40分
+      - generic [ref=e68]:
+        - generic [ref=e69]: 週間枠
+        - generic [ref=e70]:
+          - generic [ref=e71]: "9"
+          - generic [ref=e72]: "%"
+          - generic [ref=e73]: 使用
+        - meter "週間枠の使用量" [ref=e74]
+        - paragraph [ref=e76]: 残り 91%
+        - generic [ref=e77]:
+          - generic [ref=e78]: リセット 11/8 04:00
+          - strong [ref=e79]: あと4日7時間
+      - generic [ref=e80]:
+        - generic "2026/11/3 20:58:15" [ref=e81]: 最終取得 2分前 · Web 利用状況
+        - link "利用状況 ↗" [ref=e82] [cursor=pointer]:
+          - /url: https://claude.ai/settings/usage
+    - article [ref=e83]:
+      - generic [ref=e84]:
+        - heading "Cursor" [level=2] [ref=e88]
+        - generic [ref=e89]: pro
+      - generic [ref=e90]:
+        - generic [ref=e91]: 全体
+        - generic [ref=e92]:
+          - generic [ref=e93]: "30"
+          - generic [ref=e94]: "%"
+          - generic [ref=e95]: 使用
+        - meter "全体の使用量" [ref=e96]
+        - paragraph [ref=e98]: 残り 70%
+        - generic [ref=e99]:
+          - generic [ref=e100]: 請求期間終了 11/7 14:11
+          - strong [ref=e101]: あと3日17時間
+      - generic [ref=e102]:
+        - generic [ref=e103]: Other Models
+        - generic [ref=e104]:
+          - generic [ref=e105]: "63"
+          - generic [ref=e106]: "%"
+          - generic [ref=e107]: 使用
+        - meter "Other Modelsの使用量" [ref=e108]
+        - paragraph [ref=e110]: 残り 37%
+        - generic [ref=e111]:
+          - generic [ref=e112]: 請求期間終了 11/7 14:11
+          - strong [ref=e113]: あと3日17時間
+      - paragraph [ref=e114]: 追加の従量課金が有効です。上限到達後も課金して継続する場合があります。
+      - generic [ref=e115]:
+        - generic "2026/11/3 20:58:15" [ref=e116]: 最終取得 2分前 · Web 利用状況
+        - link "利用状況 ↗" [ref=e117] [cursor=pointer]:
+          - /url: https://cursor.com/dashboard/spending
+  - paragraph [ref=e118]: 余裕あり 使用50%以上 使用75%以上
+  - group [ref=e122]:
+    - generic "ブラウザー連携・初回セットアップ 接続を確認中" [ref=e123] [cursor=pointer]:
+      - text: ブラウザー連携・初回セットアップ
+      - generic [ref=e124]: 接続を確認中
