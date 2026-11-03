@@ -2,10 +2,10 @@
 <html lang="ja">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent Token Viewer</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body><main>
-  <header><div><div class="eyebrow">YOUR LOCAL WORKSPACE</div><h1>Agent Token Viewer<span class="local">LOCAL</span></h1><p>次の作業を、どのエージェントで。</p></div><button id="refresh">今すぐ更新 <span>↻</span></button></header>
+  <header><div><div class="eyebrow">YOUR LOCAL WORKSPACE</div><h1>Agent Token Viewer<span class="local">LOCAL</span></h1><p>次の作業を、どのエージェントで。</p></div><div class="actions"><button id="mode-toggle" type="button"></button><button id="refresh">今すぐ更新 <span>↻</span></button></div></header>
   <div class="toolbar"><span><i></i> 開いている間だけ3分ごとに取得</span><span id="clock"></span></div>
-  <section id="services" aria-label="サービス別の残量" aria-live="polite"></section>
-  <p class="legend"><span class="dot good"></span> 余裕あり <span class="dot warn"></span> 残り30%以下 <span class="dot danger"></span> 残り10%以下 <span class="muted">各サービスの%は同じ作業量を表しません。</span></p>
+  <section id="services" aria-label="サービス別の利用状況" aria-live="polite"></section>
+  <p class="legend"><span class="dot good"></span> 余裕あり <span class="dot warn"></span> 使用50%以上 <span class="dot danger"></span> 使用75%以上 <span class="muted">各サービスの%は同じ作業量を表しません。</span></p>
   <details id="setup"><summary>ブラウザー連携・初回セットアップ <span id="bridge">接続を確認中</span></summary><div class="setup-body">
     <p>CursorとClaudeは、ログイン済みブラウザーの拡張から利用状況のみを受け取ります。Cookieや認証トークンはこのアプリへ送信しません。</p>
     <ol><li>Edgeの <code>edge://extensions</code> でデベロッパーモードを有効にします。</li><li>「パッケージ化されていない拡張機能を読み込む」で次のフォルダーを選びます。<pre id="extension-path"></pre><button id="copy-path">フォルダーのパスをコピー</button></li><li>プロジェクトの <code>install-edge.cmd</code> を初回だけ実行します。</li><li>拡張を再読み込みし、アイコンをクリックするとアプリとメーターが起動します。最後のメータータブを閉じると取得と裏のアプリが停止します。</li></ol>

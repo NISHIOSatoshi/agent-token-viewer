@@ -1,9 +1,12 @@
 const SERVICES = { codex: { name: 'Codex', glyph: '◎', className: 'codex', href: 'https://chatgpt.com/codex/settings/usage' }, claude: { name: 'Claude', glyph: '✳', className: 'claude', href: 'https://claude.ai/settings/usage' }, cursor: { name: 'Cursor', glyph: '◈', className: 'cursor', href: 'https://cursor.com/dashboard/spending' } };
+const WARN_USED_PERCENT = 50; // 使用量がこの値以上で黄
+const DANGER_USED_PERCENT = 75; // 使用量がこの値以上で赤
 const POLL_MS = 10_000;
 const HEARTBEAT_MS = 30_000;
 const STARTUP_SYNC_MS = 30_000; // 起動直後に更新中表示を続ける最長時間
 const pageOpenedAt = Date.now();
-const viewerId = crypto.randomUUID();
+const MODE_KEY = 'agent-viewer-display-mode';
+const viewerId =crypto.randomUUID();
 let setup, current, bridgeConnected = false, manualRefreshing = false;
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
 const date = value => new Date(value).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -32,6 +35,13 @@ function isStartupSyncing(service) {
   return !(service.updatedAt && Date.parse(service.updatedAt) >= pageOpenedAt);
 }
 const isSyncing = service => manualRefreshing || isStartupSyncing(service);
+// 表示モード（使用量/残量）。既定は使用量で、選択はブラウザーに保存する。
+let showUsed = (() => { try { return localStorage.getItem(MODE_KEY) !== 'remaining'; } catch { return true; } })();
+function updateModeButton() { document.querySelector('#mode-toggle').textContent = showUsed ? '⚙ 表示: 使用量' : '⚙ 表示: 残量'; }
+function toggleMode() {
+  showUsed = !showUsed; try { localStorage.setItem(MODE_KEY, showUsed ? 'used' : 'remaining'); } catch {}
+  updateModeButton(); if (current) render(current);
+}
 function render(data) {
   const container = document.querySelector('#services'); container.replaceChildren();
   for (const service of data.services) {
@@ -46,13 +56,14 @@ function render(data) {
     for (const meter of meters) {
       const expired = meter.resetsAt && Date.parse(meter.resetsAt) <= Date.now();
       const known = meter.remainingPercent != null && !expired;
-      const level = !known || stale || service.error ? 'unknown' : meter.remainingPercent <= 10 ? 'danger' : meter.remainingPercent <= 30 ? 'warn' : 'good';
+      const level = !known || stale || service.error ? 'unknown' : meter.usedPercent >= DANGER_USED_PERCENT ? 'danger' : meter.usedPercent >= WARN_USED_PERCENT ? 'warn' : 'good';
       const block = el('div', `meter ${level}`); block.append(el('div', 'meter-label', meter.label));
-      const value = el('div', 'value'); value.append(el('span', 'number', known ? pct(meter.remainingPercent) : '—')); if (known) value.append(el('span', 'unit', '%')); value.append(el('span', 'remaining', '残り')); block.append(value);
-      const track = el('div', 'track'); track.setAttribute('role', 'meter'); track.setAttribute('aria-label', `${meter.label}の残量`); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
-      if (known) track.setAttribute('aria-valuenow', Math.min(100, meter.remainingPercent)); else track.setAttribute('aria-valuetext', '不明');
-      const fill = el('div', 'fill'); fill.style.width = known ? `${Math.min(100, meter.remainingPercent)}%` : '0%'; track.append(fill); block.append(track);
-      block.append(el('p', 'consumed', known ? `使用 ${pct(meter.usedPercent)}%${stale || service.error ? ' · 最後に取得した値' : ''}` : expired ? 'リセット後の値は未取得です' : '取得待ち・残量は不明です'));
+      const shown = showUsed ? meter.usedPercent : meter.remainingPercent; const other = showUsed ? meter.remainingPercent : meter.usedPercent;
+      const value = el('div', 'value'); value.append(el('span', 'number', known ? pct(shown) : '—')); if (known) value.append(el('span', 'unit', '%')); value.append(el('span', 'remaining', showUsed ? '使用' : '残り')); block.append(value);
+      const track = el('div', 'track'); track.setAttribute('role', 'meter'); track.setAttribute('aria-label', `${meter.label}の${showUsed ? '使用量' : '残量'}`); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
+      if (known) track.setAttribute('aria-valuenow', Math.min(100, shown)); else track.setAttribute('aria-valuetext', '不明');
+      const fill = el('div', 'fill'); fill.style.width = known ? `${Math.min(100, shown)}%` : '0%'; track.append(fill); block.append(track);
+      block.append(el('p', 'consumed', known ? `${showUsed ? '残り' : '使用'} ${pct(other)}%${stale || service.error ? ' · 最後に取得した値' : ''}` : expired ? 'リセット後の値は未取得です' : `取得待ち・${showUsed ? '使用量' : '残量'}は不明です`));
       if (meter.resetsAt) { const reset = el('div', 'reset'); reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt))); block.append(reset); }
       card.append(block);
     }
@@ -99,6 +110,7 @@ async function refreshNow() {
   finally { manualRefreshing = false; if (current) render(current); button.disabled = false; button.textContent = '今すぐ更新 ↻'; }
 }
 document.querySelector('#refresh').onclick = refreshNow;
+document.querySelector('#mode-toggle').onclick = toggleMode; updateModeButton();
 init().catch(() => { document.querySelector('#bridge').textContent = 'サーバーに接続できません'; });
 setInterval(load, POLL_MS);
 setInterval(() => { void heartbeat().catch(() => {}); }, HEARTBEAT_MS);
