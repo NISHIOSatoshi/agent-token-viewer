@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Token Viewer — Local Bridge",
+  "version": "0.2.0",
+  "description": "ログイン済みのCursor・Claudeから利用状況のみをこのPCのメーターへ送ります。",
+  "permissions": [
+    "alarms",
+    "storage",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://cursor.com/*",
+    "https://claude.ai/*",
+    "http://127.0.0.1:4317/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1:4317/*"
+      ],
+      "js": [
+        "pair.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Agent Token Viewerを開く"
+  }
+}
