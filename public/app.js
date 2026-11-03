@@ -55,7 +55,9 @@ function render(data) {
     bottom.append(lastUpdated);
     const link = el('a', '', '利用状況 ↗'); link.href = info.href; link.target = '_blank'; link.rel = 'noreferrer'; bottom.append(link); card.append(bottom); container.append(card);
   }
-  document.querySelector('#clock').textContent = `${new Date().toLocaleTimeString('ja-JP')} · 日本時間`;
+  const updatedTimes = data.services.map(service => Date.parse(service.updatedAt)).filter(Number.isFinite);
+  const latestUpdate = updatedTimes.length ? new Date(Math.max(...updatedTimes)).toISOString() : null;
+  document.querySelector('#clock').textContent = latestUpdate ? `最終取得 ${relativeTime(latestUpdate)}` : '最終取得 未取得';
 }
 async function load() {
   try { const r = await fetch('/api/state'); if (!r.ok) throw new Error(); current = await r.json(); render(current); }

@@ -29,3 +29,10 @@ test('Claudeの公式出力とWeb出力が同じ残量になる', () => {
   const b = normalizeClaude({ five_hour: { utilization: 2, resets_at: new Date(time * 1000).toISOString() } });
   assert.deepEqual(a.meters, b.meters);
 });
+test('Claudeのプラン名はWeb取得時のみ返し、claude_接頭辞を除く', () => {
+  const web = normalizeClaude({ plan: 'claude_pro', five_hour: { utilization: 2, resets_at: null } }, 'Web 利用状況');
+  assert.equal(web.plan, 'pro');
+  assert.equal(web.meters.length, 1);
+  assert.equal(normalizeClaude({ five_hour: { utilization: 2, resets_at: null } }).plan, null);
+  assert.equal(normalizeClaude({ plan: 'claude_pro', rate_limits: { five_hour: { used_percentage: 2 } } }, 'statusline').plan, null);
+});

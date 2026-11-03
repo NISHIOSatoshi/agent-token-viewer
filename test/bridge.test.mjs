@@ -32,12 +32,13 @@ test('取得可能な組織だけを選び、会話や認証情報を送らな�
     if (url.endsWith('/api/state')) return response({ active: true });
     if (url.endsWith('/api/ingest')) { posts.push(JSON.parse(options.body)); return response({}); }
     if (url.endsWith('/api/usage-summary')) return response({ membershipType: 'pro', individualUsage: { plan: { totalPercentUsed: 30 } }, private: '送信禁止' });
-    if (url.endsWith('/api/organizations')) return response([{ uuid: 'a' }, { uuid: 'b' }]);
+    if (url.endsWith('/api/organizations')) return response([{ uuid: 'a', analytics_subscription_plan: 'claude_pro', capabilities: ['送信禁止'] }, { uuid: 'b' }]);
     if (url.endsWith('/a/usage')) return response({ five_hour: { utilization: 2, resets_at: null }, secret: '送信禁止' });
     return response({}, 403);
   })();
   assert.equal(posts.length, 2);
   assert.equal(posts.find(x => x.service === 'claude').data.five_hour.utilization, 2);
+  assert.equal(posts.find(x => x.service === 'claude').data.plan, 'claude_pro');
   assert.ok(!JSON.stringify(posts).includes('送信禁止'));
 });
 test('複数組織の枠が有効な場合は勝手に選ばずエラーを届ける', async () => {

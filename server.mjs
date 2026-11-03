@@ -34,6 +34,8 @@ function receive(id, data, source, collectedAt) {
   if (!['claude', 'cursor', 'codex'].includes(id)) throw new Error('サービスが不正です。');
   const normal = id === 'codex' ? normalizeCodex(data) : id === 'cursor' ? normalizeCursor(data) : normalizeClaude(data, source);
   if (!normal.meters.length || normal.meters.every(m => m.usedPercent == null)) throw new Error('有効な利用枠がありません。プランとログイン状態を確認してください。');
+  // statusLine経由の更新ではプランが届かないため、直前のWeb取得の値を引き継ぐ。
+  if (source === 'statusline' && normal.plan == null) normal.plan = state[id].plan;
   state[id] = { id, ...normal, source, updatedAt: collectedAt ?? new Date().toISOString(), error: null };
   persist();
 }

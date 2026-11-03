@@ -26,7 +26,8 @@ async function claude() {
     if (!response.ok) throw new Error(`Claudeの利用枠取得に失敗しました（HTTP ${response.status}）。`);
     const data = await response.json();
     const selected = Object.fromEntries(['five_hour', 'seven_day', 'seven_day_sonnet', 'seven_day_opus'].filter(key => data[key]).map(key => [key, { utilization: data[key].utilization, resets_at: data[key].resets_at }]));
-    if (Object.keys(selected).length) found.push(selected);
+    // プラン名は利用枠の有無の判定後に付与する（プランだけの組織を有効と誤判定しない）。
+    if (Object.keys(selected).length) found.push(typeof org.analytics_subscription_plan === 'string' ? { ...selected, plan: org.analytics_subscription_plan } : selected);
   }
   if (found.length > 1) throw new Error('Claudeで複数組織の利用枠が見つかりました。取り違え防止のため取得を停止しています。');
   if (!found.length) throw new Error('Claudeの利用枠がありません。ログインと契約を確認してください。');
