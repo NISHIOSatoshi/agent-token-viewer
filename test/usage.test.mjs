@@ -22,6 +22,13 @@ test('Codexの複数枠と実際のプランを保持する', () => {
   const data = normalizeCodex({ rateLimitsByLimitId: { codex: { planType: 'plus', primary: { usedPercent: 7, windowDurationMins: 300, resetsAt: 1793686827 }, secondary: { usedPercent: 1, windowDurationMins: 10080 } }, other: { primary: { usedPercent: 12 } } } });
   assert.equal(data.meters.length, 3); assert.equal(data.plan, 'plus'); assert.equal(data.meters[0].remainingPercent, 93);
   assert.equal(data.meters[0].resetsAt, new Date(1793686827 * 1000).toISOString());
+  assert.equal(data.meters[0].label, 'codex · 5時間枠');
+  assert.equal(data.meters[1].label, 'codex · 週間枠');
+});
+test('Codex単一グループはClaudeと同じ枠名にする', () => {
+  const data = normalizeCodex({ rateLimitsByLimitId: { codex: { planType: 'plus', primary: { usedPercent: 0, windowDurationMins: 300 }, secondary: { usedPercent: 5, windowDurationMins: 10080 } } } });
+  assert.equal(data.meters[0].label, '5時間枠');
+  assert.equal(data.meters[1].label, '週間枠');
 });
 test('Claudeの公式出力とWeb出力が同じ残量になる', () => {
   const time = 1793686827;
