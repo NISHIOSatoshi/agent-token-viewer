@@ -11,6 +11,7 @@ const HEARTBEAT_MS = 30_000;
 const STARTUP_SYNC_MS = 30_000; // 起動直後に更新中表示を続ける最長時間
 const pageOpenedAt = Date.now();
 const MODE_KEY = 'agent-viewer-display-mode';
+const THEME_KEY = 'agent-viewer-theme';
 const viewerId =crypto.randomUUID();
 let setup, current, bridgeConnected = false, manualRefreshing = false;
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
@@ -42,7 +43,22 @@ function isStartupSyncing(service) {
 const isSyncing = service => manualRefreshing || isStartupSyncing(service);
 // 表示モード（使用量/残量）。既定は使用量で、選択はブラウザーに保存する。
 let showUsed = (() => { try { return localStorage.getItem(MODE_KEY) !== 'remaining'; } catch { return true; } })();
-function updateModeButton() { document.querySelector('#mode-toggle').textContent = showUsed ? '⚙ 表示: 使用量' : '⚙ 表示: 残量'; }
+function updateModeButton() { document.querySelector('#mode-toggle').textContent = showUsed ? '残量を表示' : '使用量を表示'; }
+// テーマ（ライト/ダーク）。既定はライトで、選択はブラウザーに保存する。
+let theme = (() => { try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } })();
+// 線描画のアイコン（Heroicons outline、24x24）。
+const THEME_ICONS = { light: 'M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z', dark: 'M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z' };
+const strokeIconNode = pathData => {
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); const path = document.createElementNS(ns, 'path');
+  for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(key, value);
+  path.setAttribute('d', pathData); svg.append(path); return svg;
+};
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+  const button = document.querySelector('#theme-toggle'); const label = theme === 'dark' ? 'ダークモード（押すとライトモード）' : 'ライトモード（押すとダークモード）';
+  button.replaceChildren(strokeIconNode(THEME_ICONS[theme])); button.setAttribute('aria-label', label); button.title = label;
+}
+function toggleTheme() { theme = theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(); }
 function toggleMode() {
   showUsed = !showUsed; try { localStorage.setItem(MODE_KEY, showUsed ? 'used' : 'remaining'); } catch {}
   updateModeButton(); if (current) render(current);
@@ -108,15 +124,16 @@ async function heartbeat(closed = false) {
 window.addEventListener('pagehide', () => { void heartbeat(true).catch(() => {}); });
 window.addEventListener('pageshow', event => { if (event.persisted) { void heartbeat().catch(() => {}); window.dispatchEvent(new Event('agent-viewer-ready')); } });
 document.querySelector('#copy-path').onclick = async () => { await navigator.clipboard.writeText(setup.extensionPath); document.querySelector('#copy-path').textContent = 'コピーしました'; };
-// 「今すぐ更新」ボタンの押下と同じ処理。起動時にも自動で実行する。
+// 「更新」ボタンの押下と同じ処理。起動時にも自動で実行する。
 async function refreshNow() {
   if (manualRefreshing) return;
   const button = document.querySelector('#refresh'); button.disabled = true; button.textContent = '更新中…'; manualRefreshing = true; if (current) render(current);
   try { await fetch('/api/refresh', { method: 'POST', headers: { Authorization: `Bearer ${setup.token}` } }); window.dispatchEvent(new Event('agent-viewer-refresh')); await new Promise(resolve => setTimeout(resolve, 2000)); await load(); }
-  finally { manualRefreshing = false; if (current) render(current); button.disabled = false; button.textContent = '今すぐ更新 ↻'; }
+  finally { manualRefreshing = false; if (current) render(current); button.disabled = false; button.textContent = '更新'; }
 }
 document.querySelector('#refresh').onclick = refreshNow;
 document.querySelector('#mode-toggle').onclick = toggleMode; updateModeButton();
+document.querySelector('#theme-toggle').onclick = toggleTheme; applyTheme();
 init().catch(() => { document.querySelector('#bridge').textContent = 'サーバーに接続できません'; });
 setInterval(load, POLL_MS);
 setInterval(() => { void heartbeat().catch(() => {}); }, HEARTBEAT_MS);
