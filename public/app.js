@@ -1,8 +1,10 @@
 const SERVICES = { codex: { name: 'Codex', glyph: '◎', className: 'codex', href: 'https://chatgpt.com/codex/settings/usage' }, claude: { name: 'Claude', glyph: '✳', className: 'claude', href: 'https://claude.ai/settings/usage' }, cursor: { name: 'Cursor', glyph: '◈', className: 'cursor', href: 'https://cursor.com/dashboard/spending' } };
 const POLL_MS = 10_000;
 const HEARTBEAT_MS = 30_000;
+const STARTUP_SYNC_MS = 30_000; // 起動直後に更新中表示を続ける最長時間
+const pageOpenedAt = Date.now();
 const viewerId = crypto.randomUUID();
-let setup, current, bridgeConnected = false;
+let setup, current, bridgeConnected = false, manualRefreshing = false;
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
 const date = value => new Date(value).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const pct = value => value.toLocaleString('ja-JP', { maximumFractionDigits: 0 });
@@ -24,6 +26,12 @@ function countdown(timestamp) {
   if (minutes >= 1440) return `あと${Math.floor(minutes / 1440)}日${Math.floor(minutes % 1440 / 60)}時間`;
   return `あと${Math.floor(minutes / 60)}時間${minutes % 60}分`;
 }
+// 起動後、このページ開始以降の取得が届くまで（上限あり）は更新中として扱う。
+function isStartupSyncing(service) {
+  if (Date.now() - pageOpenedAt >= STARTUP_SYNC_MS) return false;
+  return !(service.updatedAt && Date.parse(service.updatedAt) >= pageOpenedAt);
+}
+const isSyncing = service => manualRefreshing || isStartupSyncing(service);
 function render(data) {
   const container = document.querySelector('#services'); container.replaceChildren();
   for (const service of data.services) {
@@ -31,8 +39,9 @@ function render(data) {
     const head = el('div', 'card-head'); const brand = el('div', 'brand'); brand.append(el('span', 'glyph', info.glyph), el('h2', '', info.name));
     head.append(brand, el('span', 'plan', service.plan ?? '—')); card.append(head);
     const stale = !service.updatedAt || service.stale || Date.now() - Date.parse(service.updatedAt) > 360_000;
-    const status = service.error ? '取得失敗' : !service.updatedAt ? '未接続' : stale ? '古いデータ' : '取得済み';
-    card.append(el('div', `status ${service.error || stale ? 'uncertain' : ''}`, status));
+    const syncing = isSyncing(service);
+    const status = syncing ? '更新中…' : service.error ? '取得失敗' : !service.updatedAt ? '未接続' : stale ? '古いデータ' : '取得済み';
+    card.append(el('div', `status ${syncing ? 'syncing' : service.error || stale ? 'uncertain' : ''}`, status)); if (syncing) card.classList.add('is-syncing');
     const meters = service.meters.length ? service.meters : [{ label: '利用枠', remainingPercent: null }];
     for (const meter of meters) {
       const expired = meter.resetsAt && Date.parse(meter.resetsAt) <= Date.now();
@@ -57,7 +66,8 @@ function render(data) {
   }
   const updatedTimes = data.services.map(service => Date.parse(service.updatedAt)).filter(Number.isFinite);
   const latestUpdate = updatedTimes.length ? new Date(Math.max(...updatedTimes)).toISOString() : null;
-  document.querySelector('#clock').textContent = latestUpdate ? `最終取得 ${relativeTime(latestUpdate)}` : '最終取得 未取得';
+  const anySyncing = data.services.some(isSyncing);
+  document.querySelector('#clock').textContent = anySyncing ? (manualRefreshing ? '更新中…' : '起動時の更新中…') : latestUpdate ? `最終取得 ${relativeTime(latestUpdate)}` : '最終取得 未取得';
 }
 async function load() {
   try { const r = await fetch('/api/state'); if (!r.ok) throw new Error(); current = await r.json(); render(current); }
@@ -71,6 +81,7 @@ async function init() {
   await heartbeat();
   window.dispatchEvent(new Event('agent-viewer-ready'));
   setTimeout(() => { if (!bridgeConnected) { document.querySelector('#bridge').textContent = '拡張未接続'; document.querySelector('#setup').open = true; } }, 2500);
+  void refreshNow().catch(() => {});
   await load();
 }
 async function heartbeat(closed = false) {
@@ -80,11 +91,14 @@ async function heartbeat(closed = false) {
 window.addEventListener('pagehide', () => { void heartbeat(true).catch(() => {}); });
 window.addEventListener('pageshow', event => { if (event.persisted) { void heartbeat().catch(() => {}); window.dispatchEvent(new Event('agent-viewer-ready')); } });
 document.querySelector('#copy-path').onclick = async () => { await navigator.clipboard.writeText(setup.extensionPath); document.querySelector('#copy-path').textContent = 'コピーしました'; };
-document.querySelector('#refresh').onclick = async () => {
-  const button = document.querySelector('#refresh'); button.disabled = true; button.textContent = '更新中…';
+// 「今すぐ更新」ボタンの押下と同じ処理。起動時にも自動で実行する。
+async function refreshNow() {
+  if (manualRefreshing) return;
+  const button = document.querySelector('#refresh'); button.disabled = true; button.textContent = '更新中…'; manualRefreshing = true; if (current) render(current);
   try { await fetch('/api/refresh', { method: 'POST', headers: { Authorization: `Bearer ${setup.token}` } }); window.dispatchEvent(new Event('agent-viewer-refresh')); await new Promise(resolve => setTimeout(resolve, 2000)); await load(); }
-  finally { button.disabled = false; button.textContent = '今すぐ更新 ↻'; }
-};
+  finally { manualRefreshing = false; if (current) render(current); button.disabled = false; button.textContent = '今すぐ更新 ↻'; }
+}
+document.querySelector('#refresh').onclick = refreshNow;
 init().catch(() => { document.querySelector('#bridge').textContent = 'サーバーに接続できません'; });
 setInterval(load, POLL_MS);
 setInterval(() => { void heartbeat().catch(() => {}); }, HEARTBEAT_MS);
