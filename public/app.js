@@ -55,8 +55,7 @@ function render(data) {
     head.append(brand, el('span', 'plan', service.plan ?? '—')); card.append(head);
     const stale = !service.updatedAt || service.stale || Date.now() - Date.parse(service.updatedAt) > 360_000;
     const syncing = isSyncing(service);
-    const status = syncing ? '更新中…' : service.error ? '取得失敗' : !service.updatedAt ? '未接続' : stale ? '古いデータ' : '取得済み';
-    card.append(el('div', `status ${syncing ? 'syncing' : service.error || stale ? 'uncertain' : ''}`, status)); if (syncing) card.classList.add('is-syncing');
+    if (syncing) card.classList.add('is-syncing');
     const meters = service.meters.length ? service.meters : [{ label: '利用枠', remainingPercent: null }];
     for (const meter of meters) {
       const expired = meter.resetsAt && Date.parse(meter.resetsAt) <= Date.now();
