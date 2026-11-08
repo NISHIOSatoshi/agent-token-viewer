@@ -6,7 +6,8 @@ test('CursorのCursor ModelsとOther Modelsを分離し、金額の残りゼロ�
   assert.equal(data.meters[0].label, 'Cursor Models');
   assert.ok(Math.abs(data.meters[0].remainingPercent - 70.0635) < 0.0001);
   assert.ok(Math.abs(data.meters[1].remainingPercent - 37.4222) < 0.0001);
-  assert.equal(data.meters[0].resetsAt, null);
+  assert.equal(data.meters[0].resetsAt, '2026-11-07T05:11:40.000Z');
+  assert.equal(data.meters[0].resetLabel, '請求期間終了');
   assert.equal(data.meters[1].resetLabel, '請求期間終了');
   assert.equal(data.meters[1].resetsAt, '2026-11-07T05:11:40.000Z');
   assert.equal(data.meters.length, 2);
@@ -23,7 +24,7 @@ test('CursorのOther ModelsとGrok Botをコンパクトにし、請求リセッ
   assert.equal(data.meters.length, 3);
   assert.equal(data.meters[0].label, 'Cursor Models');
   assert.equal(data.meters[0].compact, undefined);
-  assert.equal(data.meters[0].resetsAt, null);
+  assert.equal(data.meters[0].resetsAt, '2026-11-07T05:11:40.000Z');
   assert.equal(data.meters[1].compact, true);
   assert.equal(data.meters[1].resetsAt, '2026-11-07T05:11:40.000Z');
   assert.equal(data.meters[2].id, 'grok-bot');
@@ -76,4 +77,18 @@ test('Claudeのプラン名はWeb取得時のみ返し、claude_接頭辞を除�
   assert.equal(web.meters.length, 1);
   assert.equal(normalizeClaude({ five_hour: { utilization: 2, resets_at: null } }).plan, null);
   assert.equal(normalizeClaude({ plan: 'claude_pro', rate_limits: { five_hour: { used_percentage: 2 } } }, 'statusline').plan, null);
+});
+test('各メーターに経過リング用の窓の長さ（分）を持たせる', () => {
+  const claude = normalizeClaude({ five_hour: { utilization: 1, resets_at: '2026-11-08T10:00:00Z' }, seven_day: { utilization: 1, resets_at: '2026-11-10T10:00:00Z' } });
+  assert.deepEqual(claude.meters.map(m => m.windowMinutes), [300, 10080]);
+  const codex = normalizeCodex({ rateLimits: { primary: { usedPercent: 1, windowDurationMins: 300, resetsAt: 1793686827 }, secondary: { usedPercent: 1, resetsAt: 1793686827 } } });
+  assert.deepEqual(codex.meters.map(m => m.windowMinutes), [300, null]);
+  const cursor = normalizeCursor({ billingCycleEnd: '2026-11-07T05:11:40Z', individualUsage: { plan: { enabled: true, limit: 2000, totalPercentUsed: 1, apiPercentUsed: 1 } }, sand: { usagePercent: 1, nextResetTimestampUtc: '2026-11-14T00:00:00.000Z', hasNonZeroIncludedLimit: true } });
+  assert.deepEqual(cursor.meters.map(m => m.windowMinutes), [31 * 1440, 31 * 1440, 10080]);
+});
+test('請求期間の長さは月末でも1か月前に丸めて推定し、終了日が不明ならnullにする', () => {
+  const base = { individualUsage: { plan: { enabled: true, limit: 2000, totalPercentUsed: 1, apiPercentUsed: 1 } } };
+  assert.equal(normalizeCursor({ ...base, billingCycleEnd: '2026-03-31T00:00:00Z' }).meters[1].windowMinutes, 31 * 1440);
+  assert.equal(normalizeCursor({ ...base, billingCycleEnd: '2026-03-30T00:00:00Z' }).meters[1].windowMinutes, 30 * 1440);
+  assert.equal(normalizeCursor({ ...base, billingCycleEnd: null }).meters[1].windowMinutes, null);
 });

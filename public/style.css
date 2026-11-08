@@ -40,3 +40,36 @@
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;min-width:80px;padding:0 16px;border:2px solid #3f3f46;border-radius:12px;background:transparent;color:#e6eaf0;font-size:var(--fs-ui);font-weight:500;line-height:1;white-space:nowrap;transition:transform .15s,background-color .15s,opacity .15s}.btn:hover{background:#27272a}.btn:active{transform:scale(.97)}.btn:focus-visible{outline:2px solid #006fee;outline-offset:2px}.btn.sm{height:32px;min-width:64px;padding:0 12px;border-radius:8px;font-size:var(--fs-body)}.btn.icon{width:40px;min-width:40px;padding:0}.btn svg{width:20px;height:20px;flex:none}
 :root:not([data-theme=dark]) .btn{background:transparent;border-color:#d4d4d8;color:#18181b}
 :root:not([data-theme=dark]) .btn:hover{background:#f4f4f5}#mode-toggle{font-weight:400}
+
+/* 利用枠タイル: カード内で縦に積む。既存ルールより詳細度を上げて上書きする */
+#services .meter-compact-row{border-bottom:0;padding:0}
+#services .meter{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"label label" "value consumed" "value reset" "track track";column-gap:16px;align-items:center;margin-top:12px;padding:14px 16px;border:1px solid #293747;border-radius:10px;background:#18212d}
+#services .meter-label{grid-area:label}
+#services .meter .value{grid-area:value;margin:6px 0}
+#services .meter .number{font-size:36px;letter-spacing:-1px}
+#services .meter .unit{font-size:16px}
+#services .meter .remaining{margin-left:0}
+#services .meter .consumed{grid-area:consumed;margin:0;font-size:var(--fs-micro);text-align:right}
+#services .meter .reset{grid-area:reset;min-height:0;gap:0;align-items:flex-end;font-size:var(--fs-micro);text-align:right}
+#services .meter .reset strong{font-size:var(--fs-meta)}
+#services .meter .track{grid-area:track;margin-top:8px}
+#services .meter.compact{margin-top:8px;padding:8px 12px}
+#services .meter.compact .value{margin:2px 0}
+#services .meter.compact .number{font-size:24px}
+#services .meter.compact .unit{font-size:13px}
+#services .meter.compact .track{margin-top:6px}
+:root:not([data-theme=dark]) #services .meter{background:#f7f9fc;border-color:#dde3ec}
+
+/* 窓の経過時間リング: リセット表示の左に置く。テキストは右列、リングは左列で2行分 */
+#services .meter .reset{display:grid;grid-template-columns:auto auto;justify-content:end;justify-items:end;align-items:center;column-gap:8px}
+#services .meter .reset .ring{grid-column:1;grid-row:1/3;width:28px;height:28px}
+#services .meter.compact .reset .ring{width:22px;height:22px}
+#services .meter .ring-track,#services .meter .ring-arc{stroke-width:5}
+#services .meter .ring-track{stroke:#2c3748}
+#services .meter .ring-arc{stroke:#8fb4e8}
+:root:not([data-theme=dark]) #services .meter .ring-track{stroke:#dde3ec}
+:root:not([data-theme=dark]) #services .meter .ring-arc{stroke:#2f64b0}
+
+/* リングはタイルの右端に置く。テキストは左列、リングは右列で2行分 */
+#services .meter .reset .ring{grid-column:2}
+#services .meter .reset>:not(.ring){grid-column:1}

@@ -16,7 +16,12 @@ const THEME_KEY = 'agent-viewer-theme';
 const viewerId =crypto.randomUUID();
 let setup, current, bridgeConnected = false, manualRefreshing = false;
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
-const date = value => new Date(value).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+// 「11/8(日) 19:29」の形式。曜日は1文字。
+const date = value => {
+  const time = new Date(value);
+  const weekday = time.toLocaleDateString('ja-JP', { weekday: 'narrow' });
+  return `${time.getMonth() + 1}/${time.getDate()}(${weekday}) ${time.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+};
 const pct = value => value.toLocaleString('ja-JP', { maximumFractionDigits: 0 });
 function relativeTime(timestamp, now = Date.now()) {
   const elapsed = now - Date.parse(timestamp);
@@ -35,6 +40,25 @@ function countdown(timestamp) {
   if (minutes <= 0) return 'リセット後・更新待ち';
   if (minutes >= 1440) return `あと${Math.floor(minutes / 1440)}日${Math.floor(minutes % 1440 / 60)}時間`;
   return `あと${Math.floor(minutes / 60)}時間${minutes % 60}分`;
+}
+// 窓の経過時間を円で描く。窓の長さかリセット時刻が不明、またはリセット済みなら描かない。割合は0〜1に収める。
+const RING_RADIUS = 15;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+function ringNodes(meter, now = Date.now()) {
+  const resetMs = Date.parse(meter.resetsAt);
+  if (!(meter.windowMinutes > 0) || !Number.isFinite(resetMs) || resetMs <= now) return [];
+  const windowMs = meter.windowMinutes * 60000;
+  const elapsed = Math.min(1, Math.max(0, (windowMs - (resetMs - now)) / windowMs));
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
+  for (const [key, value] of Object.entries({ viewBox: '0 0 36 36', class: 'ring', role: 'img', 'aria-label': `${meter.label}の経過時間 ${Math.round(elapsed * 100)}%` })) svg.setAttribute(key, value);
+  const track = document.createElementNS(ns, 'circle'); const arc = document.createElementNS(ns, 'circle');
+  for (const [node, className] of [[track, 'ring-track'], [arc, 'ring-arc']]) {
+    for (const [key, value] of Object.entries({ cx: '18', cy: '18', r: String(RING_RADIUS), fill: 'none', class: className })) node.setAttribute(key, value);
+    svg.append(node);
+  }
+  arc.setAttribute('stroke-dasharray', `${elapsed * RING_LENGTH} ${RING_LENGTH}`); arc.setAttribute('transform', 'rotate(-90 18 18)');
+  const title = document.createElementNS(ns, 'title'); title.textContent = `窓の経過時間 ${Math.round(elapsed * 100)}%`; svg.append(title);
+  return [svg];
 }
 // 起動後、このページ開始以降の取得が届くまで（上限あり）は更新中として扱う。
 function isStartupSyncing(service) {
@@ -80,16 +104,17 @@ function render(data) {
       const known = meter.remainingPercent != null && !expired;
       const level = !known || stale || service.error ? 'unknown' : meter.usedPercent >= DANGER_USED_PERCENT ? 'danger' : meter.usedPercent >= WARN_USED_PERCENT ? 'warn' : 'good';
       const block = el('div', `meter ${level}${meter.compact ? ' compact' : ''}`); block.append(el('div', 'meter-label', meter.label));
-      const shown = showUsed ? meter.usedPercent : meter.remainingPercent; const other = showUsed ? meter.remainingPercent : meter.usedPercent;
+      const shown = showUsed ? meter.usedPercent : meter.remainingPercent;
       const value = el('div', 'value'); value.append(el('span', 'number', known ? pct(shown) : '—')); if (known) value.append(el('span', 'unit', '%')); value.append(el('span', 'remaining', showUsed ? '使用' : '残り')); block.append(value);
       const track = el('div', 'track'); track.setAttribute('role', 'meter'); track.setAttribute('aria-label', `${meter.label}の${showUsed ? '使用量' : '残量'}`); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
       if (known) track.setAttribute('aria-valuenow', Math.min(100, shown)); else track.setAttribute('aria-valuetext', '不明');
       const fill = el('div', 'fill'); fill.style.width = known ? `${Math.min(100, shown)}%` : '0%'; track.append(fill); block.append(track);
       if (!meter.compact) {
-        block.append(el('p', 'consumed', known ? `${showUsed ? '残り' : '使用'} ${pct(other)}%${stale || service.error ? ' · 最後に取得した値' : ''}` : expired ? 'リセット後の値は未取得です' : `取得待ち・${showUsed ? '使用量' : '残量'}は不明です`));
+        const status = known ? (stale || service.error ? '最後に取得した値' : null) : expired ? 'リセット後の値は未取得です' : `取得待ち・${showUsed ? '使用量' : '残量'}は不明です`;
+        if (status) block.append(el('p', 'consumed', status));
         if (meter.resetsAt) {
           const reset = el('div', 'reset');
-          reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
+          reset.append(...ringNodes(meter), el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
           block.append(reset);
         } else if (meter.id === 'five_hour' && meter.usedPercent === 0) {
           const reset = el('div', 'reset');
@@ -97,10 +122,9 @@ function render(data) {
           block.append(reset);
         }
       } else {
-        if (known) block.append(el('p', 'consumed', `${showUsed ? '残り' : '使用'} ${pct(other)}%`));
         if (meter.resetsAt) {
           const reset = el('div', 'reset');
-          reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
+          reset.append(...ringNodes(meter), el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
           block.append(reset);
         }
       }
