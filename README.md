@@ -38,7 +38,7 @@ Cookie・サービスの認証トークン・会話本文はアプリへ送信�
 ## データ元
 
 - Codex: 公式 `codex app-server` の `account/rateLimits/read`。T3同梱CLIを自動検出し、なければPATHを利用します。環境変数 `CODEX_BIN` で実行ファイルを指定できます。既存のCLIのログインを使い、実際に取得されたプラン名を表示します。
-- Cursor: Webセッションの `/api/usage-summary`。全体は `totalPercentUsed`、Other Modelsは `apiPercentUsed`。残り率は使用率から計算します。請求期間終了の時刻は、利用枠のリセットと同義とは断定しません。
+- Cursor: Webセッションの `/api/usage-summary`。Cursor Modelsは `totalPercentUsed`、Other Modelsは `apiPercentUsed`。残り率は使用率から計算します。請求期間終了の時刻は、利用枠のリセットと同義とは断定しません。Grok Botの週間枠は同じログインの `POST /api/dashboard/get-sand-usage-status` から取得し、個人枠がある場合のみ表示します。Other ModelsとGrok Botはコンパクト表示し、請求期間のリセットはCursor ModelsとOther Modelsの区切りとしてOther側に出します。
 - Claude: Webセッションの `/api/organizations/{id}/usage`。5時間・週間・取得可能なモデル別枠を表示します。取得可能な組織が複数あれば取り違え防止のため停止します。
 
 CursorとClaudeのWeb APIは非公開で変更される可能性があります。欠損を残り100%で補完しません。取得失敗時は前回値とエラーを併記します。リセット時刻を過ぎた古い残量は「—」になります。色は使用量50%以上が黄、75%以上が赤という、このアプリ独自の目安です。

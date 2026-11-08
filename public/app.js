@@ -73,21 +73,42 @@ function render(data) {
     const syncing = isSyncing(service);
     if (syncing) card.classList.add('is-syncing');
     const meters = service.meters.length ? service.meters : [{ label: '利用枠', remainingPercent: null }];
-    for (const meter of meters) {
+    let compactRow = null;
+    const appendMeter = (meter, parent) => {
       const expired = meter.resetsAt && Date.parse(meter.resetsAt) <= Date.now();
       const known = meter.remainingPercent != null && !expired;
       const level = !known || stale || service.error ? 'unknown' : meter.usedPercent >= DANGER_USED_PERCENT ? 'danger' : meter.usedPercent >= WARN_USED_PERCENT ? 'warn' : 'good';
-      const block = el('div', `meter ${level}`); block.append(el('div', 'meter-label', meter.label));
+      const block = el('div', `meter ${level}${meter.compact ? ' compact' : ''}`); block.append(el('div', 'meter-label', meter.label));
       const shown = showUsed ? meter.usedPercent : meter.remainingPercent; const other = showUsed ? meter.remainingPercent : meter.usedPercent;
       const value = el('div', 'value'); value.append(el('span', 'number', known ? pct(shown) : '—')); if (known) value.append(el('span', 'unit', '%')); value.append(el('span', 'remaining', showUsed ? '使用' : '残り')); block.append(value);
       const track = el('div', 'track'); track.setAttribute('role', 'meter'); track.setAttribute('aria-label', `${meter.label}の${showUsed ? '使用量' : '残量'}`); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
       if (known) track.setAttribute('aria-valuenow', Math.min(100, shown)); else track.setAttribute('aria-valuetext', '不明');
       const fill = el('div', 'fill'); fill.style.width = known ? `${Math.min(100, shown)}%` : '0%'; track.append(fill); block.append(track);
-      block.append(el('p', 'consumed', known ? `${showUsed ? '残り' : '使用'} ${pct(other)}%${stale || service.error ? ' · 最後に取得した値' : ''}` : expired ? 'リセット後の値は未取得です' : `取得待ち・${showUsed ? '使用量' : '残量'}は不明です`));
-      const reset = el('div', 'reset');
-      if (meter.resetsAt) reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
-      block.append(reset);
-      card.append(block);
+      if (!meter.compact) {
+        block.append(el('p', 'consumed', known ? `${showUsed ? '残り' : '使用'} ${pct(other)}%${stale || service.error ? ' · 最後に取得した値' : ''}` : expired ? 'リセット後の値は未取得です' : `取得待ち・${showUsed ? '使用量' : '残量'}は不明です`));
+        if (meter.resetsAt) {
+          const reset = el('div', 'reset');
+          reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
+          block.append(reset);
+        }
+      } else {
+        if (known) block.append(el('p', 'consumed', `${showUsed ? '残り' : '使用'} ${pct(other)}%`));
+        if (meter.resetsAt) {
+          const reset = el('div', 'reset');
+          reset.append(el('span', '', `${meter.resetLabel ?? 'リセット'} ${date(meter.resetsAt)}`), el('strong', '', countdown(meter.resetsAt)));
+          block.append(reset);
+        }
+      }
+      parent.append(block);
+    };
+    for (const meter of meters) {
+      if (meter.compact) {
+        if (!compactRow) { compactRow = el('div', 'meter-compact-row'); card.append(compactRow); }
+        appendMeter(meter, compactRow);
+      } else {
+        compactRow = null;
+        appendMeter(meter, card);
+      }
     }
     if (service.error) card.append(el('p', 'error', service.error));
     if (service.note) card.append(el('p', 'note', service.note));

@@ -1,19 +1,76 @@
 const LOCAL = 'http://127.0.0.1:4317';
 const INTERVAL_MINUTES = 3;
+const SAND_URL = 'https://cursor.com/api/dashboard/get-sand-usage-status';
+const SAND_ORIGIN_RULE_ID = 1;
 let running;
 let hostPort, hostReady, controller;
 const HOST = 'com.agent_token_viewer.edge';
 const meterTabs = () => chrome.tabs.query({ url: `${LOCAL}/*` });
 const signal = ms => controller ? AbortSignal.any([controller.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms);
+async function ensureSandOriginRule() {
+  // POSTのCSRF検査用。service worker由来だけ Origin/Referer を cursor.com に書き換える。
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [SAND_ORIGIN_RULE_ID],
+    addRules: [{
+      id: SAND_ORIGIN_RULE_ID,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders',
+        requestHeaders: [
+          { header: 'Origin', operation: 'set', value: 'https://cursor.com' },
+          { header: 'Referer', operation: 'set', value: 'https://cursor.com/' },
+        ],
+      },
+      condition: {
+        urlFilter: '||cursor.com/api/dashboard/get-sand-usage-status',
+        resourceTypes: ['xmlhttprequest', 'other'],
+        tabIds: [chrome.tabs.TAB_ID_NONE],
+      },
+    }],
+  });
+}
 async function json(url) {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store', signal: signal(20_000) });
   if (!response.ok) throw new Error(`取得先がHTTP ${response.status}を返しました。ブラウザーでログイン状態を確認してください。`);
   try { return await response.json(); } catch { throw new Error('ログイン画面または確認画面が返りました。サービスのWeb画面を開いてください。'); }
 }
+function pickSand(data) {
+  if (!data || typeof data !== 'object') return null;
+  const pick = (...keys) => { for (const key of keys) if (data[key] != null) return data[key]; };
+  const selected = {
+    usagePercent: pick('usagePercent', 'usage_percent'),
+    nextResetTimestampUtc: pick('nextResetTimestampUtc', 'next_reset_timestamp_utc'),
+    usesPooledEnterpriseAllowance: pick('usesPooledEnterpriseAllowance', 'uses_pooled_enterprise_allowance'),
+    includedLimitZero: pick('includedLimitZero', 'included_limit_zero'),
+    hasNonZeroIncludedLimit: pick('hasNonZeroIncludedLimit', 'has_non_zero_included_limit'),
+    isUnified: pick('isUnified', 'is_unified'),
+  };
+  return Object.values(selected).some(value => value != null) ? selected : null;
+}
+async function sandUsage() {
+  try {
+    await ensureSandOriginRule();
+    const response = await fetch(SAND_URL, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: signal(20_000),
+    });
+    if (!response.ok) return null;
+    return pickSand(await response.json());
+  } catch {
+    return null;
+  }
+}
 async function cursor() {
   const data = await json('https://cursor.com/api/usage-summary');
   if (!data.individualUsage?.plan) throw new Error('Cursorの利用状況の形式を確認できません。');
-  return { membershipType: data.membershipType, billingCycleEnd: data.billingCycleEnd, individualUsage: data.individualUsage };
+  const sand = await sandUsage();
+  return sand
+    ? { membershipType: data.membershipType, billingCycleEnd: data.billingCycleEnd, individualUsage: data.individualUsage, sand }
+    : { membershipType: data.membershipType, billingCycleEnd: data.billingCycleEnd, individualUsage: data.individualUsage };
 }
 async function claude() {
   const organizations = await json('https://claude.ai/api/organizations');

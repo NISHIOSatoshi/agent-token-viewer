@@ -1,11 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeCodex, normalizeClaude, normalizeCursor, present, STALE_MS } from '../lib/usage.mjs';
-test('Cursorの全体とOther Modelsを分離し、金額の残りゼロと混同しない', () => {
+test('CursorのCursor ModelsとOther Modelsを分離し、金額の残りゼロと混同しない', () => {
   const data = normalizeCursor({ membershipType: 'pro', billingCycleEnd: '2026-11-07T05:11:40Z', individualUsage: { plan: { enabled: true, limit: 2000, remaining: 0, totalPercentUsed: 29.9365, apiPercentUsed: 62.5778 } } });
+  assert.equal(data.meters[0].label, 'Cursor Models');
   assert.ok(Math.abs(data.meters[0].remainingPercent - 70.0635) < 0.0001);
   assert.ok(Math.abs(data.meters[1].remainingPercent - 37.4222) < 0.0001);
-  assert.equal(data.meters[0].resetLabel, '請求期間終了');
+  assert.equal(data.meters[0].resetsAt, null);
+  assert.equal(data.meters[1].resetLabel, '請求期間終了');
+  assert.equal(data.meters[1].resetsAt, '2026-11-07T05:11:40.000Z');
+  assert.equal(data.meters.length, 2);
+  assert.equal(data.meters[0].compact, undefined);
+  assert.equal(data.meters[1].compact, true);
+});
+test('CursorのOther ModelsとGrok Botをコンパクトにし、請求リセットで区切る', () => {
+  const data = normalizeCursor({
+    membershipType: 'pro',
+    billingCycleEnd: '2026-11-07T05:11:40Z',
+    individualUsage: { plan: { enabled: true, limit: 2000, totalPercentUsed: 10, apiPercentUsed: 20 } },
+    sand: { usagePercent: 12.5, nextResetTimestampUtc: '2026-11-14T00:00:00.000Z', hasNonZeroIncludedLimit: true, includedLimitZero: false, usesPooledEnterpriseAllowance: false },
+  });
+  assert.equal(data.meters.length, 3);
+  assert.equal(data.meters[0].label, 'Cursor Models');
+  assert.equal(data.meters[0].compact, undefined);
+  assert.equal(data.meters[0].resetsAt, null);
+  assert.equal(data.meters[1].compact, true);
+  assert.equal(data.meters[1].resetsAt, '2026-11-07T05:11:40.000Z');
+  assert.equal(data.meters[2].id, 'grok-bot');
+  assert.equal(data.meters[2].label, 'Grok Bot · 週間枠');
+  assert.equal(data.meters[2].usedPercent, 12.5);
+  assert.equal(data.meters[2].remainingPercent, 87.5);
+  assert.equal(data.meters[2].resetsAt, '2026-11-14T00:00:00.000Z');
+  assert.equal(data.meters[2].compact, true);
+});
+test('Grok Bot枠なし・統合プラン・組織共有はメーターを出さない', () => {
+  const base = { membershipType: 'pro', individualUsage: { plan: { enabled: true, limit: 100, totalPercentUsed: 1, apiPercentUsed: 2 } } };
+  assert.equal(normalizeCursor({ ...base, sand: { usagePercent: 0, hasNonZeroIncludedLimit: false } }).meters.length, 2);
+  assert.equal(normalizeCursor({ ...base, sand: { usagePercent: 0, includedLimitZero: true, hasNonZeroIncludedLimit: true } }).meters.length, 2);
+  assert.equal(normalizeCursor({ ...base, sand: { usagePercent: 5, hasNonZeroIncludedLimit: true, usesPooledEnterpriseAllowance: true } }).meters.length, 2);
+  assert.equal(normalizeCursor({ ...base, sand: { usagePercent: 5, hasNonZeroIncludedLimit: true, isUnified: true } }).meters.length, 2);
+  assert.equal(normalizeCursor({ ...base, sand: { hasNonZeroIncludedLimit: true } }).meters.length, 2);
 });
 test('無料アカウントや欠損値を残量100%にしない', () => {
   const data = normalizeCursor({ individualUsage: { plan: { enabled: true, limit: 0, totalPercentUsed: 0 } } });
