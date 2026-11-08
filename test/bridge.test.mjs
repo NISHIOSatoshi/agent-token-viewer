@@ -47,7 +47,7 @@ test('取得可能な組織だけを選び、会話や認証情報を送らな�
     if (url.endsWith('/a/usage')) return response({ five_hour: { utilization: 2, resets_at: null }, secret: '送信禁止' });
     return response({}, 403);
   })();
-  assert.equal(posts.length, 2);
+  assert.equal(posts.length, 3);
   assert.equal(posts.find(x => x.service === 'claude').data.five_hour.utilization, 2);
   assert.equal(posts.find(x => x.service === 'claude').data.plan, 'claude_pro');
   assert.equal(posts.find(x => x.service === 'cursor').data.sand.usagePercent, 4);
@@ -83,4 +83,35 @@ test('複数組織の枠が有効な場合は勝手に選ばずエラーを届�
     return response({ individualUsage: { plan: {} } });
   })();
   assert.match(posts.find(x => x.service === 'claude').error, /複数組織/);
+});
+
+test('CodexのWeb応答から利用枠だけを送る', async () => {
+  const posts = [];
+  const response = data => ({ ok: true, status: 200, json: async () => data });
+  await runtime(async (url, options) => {
+    if (url.endsWith('/api/state')) return response({ active: true });
+    if (url.endsWith('/api/ingest')) { posts.push(JSON.parse(options.body)); return response({}); }
+    if (url.endsWith('/api/auth/session')) return response({ accessToken: 'test-secret', account: { id: 'account-id' } });
+    if (url.endsWith('/wham/usage')) { assert.equal(options.credentials, 'include'); assert.equal(options.headers.Authorization, 'Bearer test-secret'); assert.equal(options.headers['ChatGPT-Account-Id'], 'account-id'); return response({ plan_type: 'plus', rate_limit: { primary_window: { used_percent: 12, limit_window_seconds: 18000, reset_at: 1793686827, secret: 'private' } }, secret: 'private' }); }
+    return response({});
+  })();
+  const codex = posts.find(x => x.service === 'codex');
+  assert.equal(codex.data.rateLimits.primary.windowDurationMins, 300);
+  assert.equal(codex.data.rateLimits.primary.usedPercent, 12);
+  assert.ok(!JSON.stringify(codex).includes('private'));
+  assert.ok(!JSON.stringify(codex).includes('test-secret'));
+  assert.ok(!JSON.stringify(codex).includes('account-id'));
+});
+
+test('ChatGPTセッションがない場合は認証情報を送らずエラーを表示する', async () => {
+  const posts = []; const calls = [];
+  const response = data => ({ ok: true, status: 200, json: async () => data });
+  await runtime(async (url, options) => {
+    calls.push(url);
+    if (url.endsWith('/api/state')) return response({ active: true });
+    if (url.endsWith('/api/ingest')) { posts.push(JSON.parse(options.body)); return response({}); }
+    return response({});
+  })();
+  assert.match(posts.find(x => x.service === 'codex').error, /セッション/);
+  assert.ok(!calls.some(url => url.endsWith('/wham/usage')));
 });

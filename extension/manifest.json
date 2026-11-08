@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Agent Token Viewer — Local Bridge",
   "version": "0.3.0",
-  "description": "ログイン済みのCursor・Claudeから利用状況のみをこのPCのメーターへ送ります。",
+  "description": "ログイン済みのCodex・Cursor・Claudeから利用状況のみをこのPCのメーターへ送ります。",
   "permissions": [
     "alarms",
     "storage",
@@ -12,6 +12,7 @@
   "host_permissions": [
     "https://cursor.com/*",
     "https://claude.ai/*",
+    "https://chatgpt.com/*",
     "http://127.0.0.1:4317/*"
   ],
   "background": {

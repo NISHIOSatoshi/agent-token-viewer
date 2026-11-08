@@ -90,6 +90,21 @@ async function claude() {
   if (!found.length) throw new Error('Claudeの利用枠がありません。ログインと契約を確認してください。');
   return found[0];
 }
+// Webセッションで取得できる場合のみ利用する。認証情報はローカルへ送らない。
+async function codex() {
+  const session = await json('https://chatgpt.com/api/auth/session');
+  if (typeof session.accessToken !== 'string' || !session.accessToken) throw new Error('ChatGPTのWebセッションを確認できません。拡張を入れたブラウザーでログインしてください。');
+  const headers = { Authorization: `Bearer ${session.accessToken}`, Accept: 'application/json' };
+  if (typeof session.account?.id === 'string' && session.account.id) headers['ChatGPT-Account-Id'] = session.account.id;
+  const response = await fetch('https://chatgpt.com/backend-api/wham/usage', { headers, credentials: 'include', cache: 'no-store', signal: signal(20_000) });
+  if (!response.ok) throw new Error(`CodexのWeb利用枠を取得できません（HTTP ${response.status}）。ChatGPTのログインとワークスペースを確認してください。`);
+  let data;
+  try { data = await response.json(); } catch { throw new Error('CodexのWeb利用枠の応答を確認できません。'); }
+  const convert = window => window && ({ usedPercent: window.used_percent, windowDurationMins: typeof window.limit_window_seconds === 'number' ? window.limit_window_seconds / 60 : null, resetsAt: window.reset_at });
+  const limits = data.rate_limit;
+  if (!limits || ![limits.primary_window, limits.secondary_window].some(w => typeof w?.used_percent === 'number' && Number.isFinite(w.used_percent))) throw new Error('CodexのWeb利用枠を確認できません。ChatGPTのログインとプランを確認してください。');
+  return { rateLimits: { planType: typeof data.plan_type === 'string' ? data.plan_type : null, primary: convert(limits.primary_window), secondary: convert(limits.secondary_window) } };
+}
 async function post(token, payload) {
   const r = await fetch(`${LOCAL}/api/ingest`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000) });
   if (!r.ok) throw new Error('ローカルメーターに接続できません。ページを開き直してください。');
@@ -102,7 +117,7 @@ function collect() {
     if (!token) return;
     try { const health = await fetch(`${LOCAL}/api/state`, { signal: AbortSignal.timeout(3000) }); if (!health.ok || !(await health.json()).active) return; } catch { return; }
     controller = new AbortController();
-    await Promise.allSettled([['cursor', cursor], ['claude', claude]].map(async ([service, read]) => {
+    await Promise.allSettled([['cursor', cursor], ['claude', claude], ['codex', codex]].map(async ([service, read]) => {
       let payload;
       try { payload = { service, data: await read() }; }
       catch (error) { payload = { service, error: error.message }; }

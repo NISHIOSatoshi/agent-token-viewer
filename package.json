@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check lib/usage.mjs && node --check lib/codex.mjs && node --check public/app.js && node --check extension/background.js && node --check extension/pair.js && node --check scripts/claude-hook.mjs && node --check scripts/native-host.mjs && node --check scripts/register-edge.mjs && node --check lib/viewers.mjs && node --check lib/native-protocol.mjs && node --check extension/setup.js"
+    "check": "node --check server.mjs && node --check lib/usage.mjs && node --check public/app.js && node --check extension/background.js && node --check extension/pair.js && node --check scripts/claude-hook.mjs && node --check scripts/native-host.mjs && node --check scripts/register-edge.mjs && node --check lib/viewers.mjs && node --check lib/native-protocol.mjs && node --check extension/setup.js"
   },
   "engines": {
     "node": ">=22"

@@ -4,7 +4,6 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCodex } from './lib/codex.mjs';
 import { normalizeCodex, normalizeClaude, normalizeCursor, present, REFRESH_MS } from './lib/usage.mjs';
 import { createViewers } from './lib/viewers.mjs';
 
@@ -19,10 +18,9 @@ catch { token = randomBytes(32).toString('hex'); await writeFile(path.join(local
 const initial = id => ({ id, plan: null, source: null, meters: [], updatedAt: null, error: null });
 const state = Object.fromEntries(['codex', 'claude', 'cursor'].map(id => [id, initial(id)]));
 const viewers = createViewers();
-let lastAttempt = 0;
 try {
   const saved = JSON.parse(await readFile(path.join(local, 'snapshot.json'), 'utf8'));
-  for (const id of Object.keys(state)) if (saved[id]?.id === id && Array.isArray(saved[id].meters)) state[id] = saved[id];
+  for (const id of Object.keys(state)) if (saved[id]?.id === id && Array.isArray(saved[id].meters) && !(id === 'codex' && saved[id].source === '公式 App Server')) state[id] = saved[id];
 } catch { /* 初回は未取得で開始する。 */ }
 let writeQueue = Promise.resolve();
 function persist() {
@@ -38,17 +36,6 @@ function receive(id, data, source, collectedAt) {
   if (source === 'statusline' && normal.plan == null) normal.plan = state[id].plan;
   state[id] = { id, ...normal, source, updatedAt: collectedAt ?? new Date().toISOString(), error: null };
   persist();
-}
-let refreshing;
-function refreshCodex() {
-  if (refreshing) return refreshing;
-  lastAttempt = Date.now();
-  refreshing = (async () => {
-    try { receive('codex', await readCodex(), '公式 App Server'); }
-    catch (error) { state.codex.error = error.message; persist(); }
-    finally { refreshing = null; }
-  })();
-  return refreshing;
 }
 function authorized(request) {
   const supplied = Buffer.from(request.headers.authorization?.replace(/^Bearer /, '') ?? '');
@@ -83,21 +70,19 @@ const server = http.createServer(async (request, response) => {
     if (url.pathname === '/api/refresh' && request.method === 'POST') {
       if (!authorized(request)) return reply(401, {});
       if (!viewers.active()) return reply(409, { error: 'メーターを開いてください。' });
-      void refreshCodex(); return reply(202, { ok: true });
+      return reply(202, { ok: true });
     }
     if (url.pathname === '/api/viewer' && request.method === 'POST') {
       if (!authorized(request)) return reply(401, {});
       const body = await readBody(request);
       if (typeof body.id !== 'string' || body.id.length > 100) return reply(400, {});
-      const wasActive = viewers.active();
       if (body.closed) viewers.remove(body.id); else viewers.touch(body.id);
-      if (!body.closed && (!wasActive || Date.now() - lastAttempt >= REFRESH_MS)) void refreshCodex();
       return reply(200, { active: viewers.active() });
     }
     if (url.pathname === '/api/ingest' && request.method === 'POST') {
       if (!authorized(request)) return reply(401, {});
       const body = await readBody(request);
-      if (!['cursor', 'claude'].includes(body.service)) return reply(400, { error: 'サービスが不正です。' });
+      if (!['cursor', 'claude', 'codex'].includes(body.service)) return reply(400, { error: 'サービスが不正です。' });
       if (body.error) {
         state[body.service].error = String(body.error).slice(0, 300); persist();
       } else receive(body.service, body.data, body.source === 'statusline' ? 'statusline' : 'Web 利用状況');
@@ -124,7 +109,6 @@ server.listen(port, '127.0.0.1', () => {
 });
 });
 ready.catch(() => {});
-setInterval(() => { if (viewers.active() && Date.now() - lastAttempt >= REFRESH_MS) void refreshCodex(); }, 5000).unref();
 // 公式statusLineから保存されたデータはWeb取得より新しい場合のみ採用する。
 setInterval(async () => {
   if (!viewers.active()) return;
