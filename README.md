@@ -32,13 +32,10 @@ Windows、Node.js 22以上、およびMicrosoft EdgeまたはGoogle Chromeが必
 ## 更新と停止
 
 - メーターを開いた直後に取得し、タブが開いている間だけ3分ごとに更新します。背面のタブでも開いていれば更新します。
-- 各サービスの取得前に、使用中のブラウザー内にメーターのタブがあることを確認します。
-- 最後のメータータブを閉じるか別ページへ移動すると、拡張の定期取得を解除し、進行中のWeb取得を中止します。拡張から起動したアプリも接続切断によって終了します。複数タブがある場合は最後の1枚を閉じるまで動きます。
 - ブラウザーを終了すれば拡張から起動したアプリも終了します。
 - 異常終了などで画面の終了通知が届かない場合に備えて、画面からのハートビートが150秒以上途絶えると取得を止めます。
-- 閉じる直前に送信済みの問い合わせはサービス側で処理される場合があります。
 
-Cookie・サービスの認証トークン・会話本文はアプリへ送信しません。T3プレビューでのログインは通常のEdgeと共有されません。6分より古い値は「古いデータ」と表示します。
+Cookie・サービスの認証トークン・会話本文はアプリへ送信しません。6分より古い値は「古いデータ」と表示します。
 
 ## 手動起動（補助）
 
@@ -48,20 +45,35 @@ Cookie・サービスの認証トークン・会話本文はアプリへ送信�
 
 ## データ元
 
-- Codex: 拡張機能がChatGPTのWebセッションから短期の認証情報を取得し、`/backend-api/wham/usage` の取得に使用します。認証情報は拡張内で一時的に扱い、ローカルアプリへ送信・保存しません。非公開仕様のため動作は環境に依存します。
-- Cursor: Webセッションの `/api/usage-summary`。Cursor Modelsは `totalPercentUsed`、Other Modelsは `apiPercentUsed`。残り率は使用率から計算します。請求期間終了の時刻は、利用枠のリセットと同義とは断定しません。Grok Botの週間枠は同じログインの `POST /api/dashboard/get-sand-usage-status` から取得し、個人枠がある場合のみ表示します。Other ModelsとGrok Botはコンパクト表示し、請求期間のリセットはCursor ModelsとOther Modelsの区切りとしてOther側に出します。
-- Claude: Webセッションの `/api/organizations/{id}/usage`。5時間・週間・取得可能なモデル別枠を表示します。取得可能な組織が複数あれば取り違え防止のため停止します。
+- Codex
+  - 取得元: ChatGPTのWebセッション `/backend-api/wham/usage`
+  - 表示: 取得できた利用枠（5時間・週間など）
+  - 注意: 拡張機能が短期の認証情報を取得して使います。認証情報は拡張内で一時的に扱い、ローカルアプリへ送信・保存しません。非公開仕様のため動作は環境に依存します。
+- Cursor
+  - 取得元: Webセッション `/api/usage-summary`。Grok Botは同じログインの `POST /api/dashboard/get-sand-usage-status`
+  - 表示: Cursor Models（`totalPercentUsed`）、Other Models（`apiPercentUsed`）、個人枠がある場合のみGrok Botの週間枠。残り率は使用率から計算します。
+  - 注意: 請求期間終了の時刻は、利用枠のリセットと同義とは断定しません。経過リングの窓の長さは請求期間終了の1か月前（月末は丸め）からの推定で、実際とずれることがあります。Grok Botは7日間の窓として扱います。
+- Claude
+  - 取得元: Webセッション `/api/organizations/{id}/usage`
+  - 表示: 5時間・週間・取得可能なモデル別枠
+  - 注意: 取得可能な組織が複数あれば、取り違え防止のため停止します。
 
 Codex・Cursor・ClaudeのWeb APIは非公開で変更される可能性があります。欠損を残り100%で補完しません。取得失敗時は前回値とエラーを併記します。リセット時刻を過ぎた古い残量は「—」になります。
 
-## Claudeの公式出力による補助連携
+## 他のサービスを追加する
 
-任意で `scripts/claude-hook.mjs` をClaude Codeの `statusLine` コマンドに指定できます。公式の `rate_limits` だけを保存します。既存の設定は自動変更しません。設定済みの場合は置き換えずに既存処理と組み合わせてください。ヘッドレス・T3経由でstatusLineが実行されることは保証しません。CLI未使用中は更新されません。
+Claude Codeなどに次のプロンプトを渡します。`<>` の部分は書き換えてください。
 
-例（絶対パスを実際の配置先に合わせます）:
+```text
+このリポジトリに「<サービス名>」の利用枠表示を追加してください。
+利用状況の取得先は <URL（ログイン後のWeb画面やAPI）> です。
 
-```json
-{"statusLine":{"type":"command","command":"node C:/path/to/agent-token-viewer/scripts/claude-hook.mjs"}}
+- 取得: extension/background.js に、ログイン済みブラウザーのWebセッションから取得する処理を追加し、定期取得の対象に登録する。extension/manifest.json の権限も追加する。Cookieや認証情報はアプリへ送らない
+- サーバー: server.mjs のサービス一覧に追加する
+- 正規化: lib/usage.mjs に normalize<サービス名> を追加する。使用率・リセット時刻・窓の長さ（windowMinutes）を持たせる
+- 表示: public/app.js の SERVICES に名前・アイコン・リンクを追加する
+- テスト: test/usage.test.mjs に正規化のテストを追加する
+- 最後に npm run check と npm test を実行し、結果をそのまま報告する
 ```
 
 ## 保存と検証
