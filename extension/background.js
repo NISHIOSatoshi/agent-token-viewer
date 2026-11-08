@@ -125,7 +125,7 @@ function ensureHost() {
   if (hostReady) return hostReady;
   hostReady = new Promise((resolve, reject) => {
     let completed = false;
-    const timer = setTimeout(() => fail('起動がタイムアウトしました。Edge用の初回登録を確認してください。'), 15000);
+    const timer = setTimeout(() => fail('起動がタイムアウトしました。ブラウザーの初回登録を確認してください。'), 15000);
     const fail = error => {
       if (completed) return;
       completed = true; clearTimeout(timer); hostReady = null;

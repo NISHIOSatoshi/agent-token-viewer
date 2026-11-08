@@ -4,9 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const name = 'com.agent_token_viewer.edge';
-const registry = `HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${name}`;
-if (process.platform !== 'win32') throw new Error('Edge用の登録はWindowsで実行してください。');
-const target = path.join(root, '.local', 'native-host.json');
+const browser = process.argv.includes('--chrome') ? 'Chrome' : 'Edge';
+const registryBase = browser === 'Chrome' ? 'Google\\Chrome' : 'Microsoft\\Edge';
+const registry = `HKCU\\Software\\${registryBase}\\NativeMessagingHosts\\${name}`;
+if (process.platform !== 'win32') throw new Error(`${browser}用の登録はWindowsで実行してください。`);
+const target = path.join(root, '.local', browser === 'Chrome' ? 'native-host-chrome.json' : 'native-host.json');
 if (process.argv.includes('--remove')) {
   // この配置先で登録したものだけを解除する。
   let value;
@@ -14,7 +16,7 @@ if (process.argv.includes('--remove')) {
   catch { console.log('登録はありません。'); process.exit(0); }
   if (!value.toLowerCase().includes(target.toLowerCase())) throw new Error('別の配置先が登録されています。解除を中止しました。');
   execFileSync('reg.exe', ['delete', registry, '/f'], { stdio: 'pipe', windowsHide: true });
-  console.log('Edgeからの起動登録を解除しました。');
+  console.log(`${browser}からの起動登録を解除しました。`);
   process.exit(0);
 }
 const ids = new Set();
@@ -24,7 +26,7 @@ if (explicit !== -1) {
   if (!/^[a-p]{32}$/.test(id ?? '')) throw new Error('拡張IDはa〜pの32文字で指定してください。');
   ids.add(id);
 } else {
-  const userData = path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'User Data');
+  const userData = path.join(process.env.LOCALAPPDATA, ...(browser === 'Chrome' ? ['Google', 'Chrome'] : ['Microsoft', 'Edge']), 'User Data');
   for (const profile of await readdir(userData)) {
     if (!/^(Default|Profile \d+)$/.test(profile)) continue;
     for (const file of ['Preferences', 'Secure Preferences']) {
@@ -36,12 +38,12 @@ if (explicit !== -1) {
     }
   }
 }
-if (!ids.size) throw new Error('Edgeにこの拡張が見つかりません。先にextensionフォルダーを読み込むか、install-edge.cmd --id 拡張ID を実行してください。');
+if (!ids.size) throw new Error(`${browser}にこの拡張が見つかりません。先にextensionフォルダーを読み込むか、install-${browser.toLowerCase()}.cmd --id 拡張ID を実行してください。`);
 await mkdir(path.join(root, '.local'), { recursive: true });
 const launcher = path.join(root, '.local', 'native-host.cmd');
 const quoteBatch = value => value.replaceAll('%', '%%');
 await writeFile(launcher, `@echo off\r\n"${quoteBatch(process.execPath)}" "${quoteBatch(path.join(root, 'scripts', 'native-host.mjs'))}"\r\n`);
-await writeFile(target, JSON.stringify({ name, description: 'Agent Token Viewer Edge Launcher', path: launcher, type: 'stdio', allowed_origins: [...ids].map(id => `chrome-extension://${id}/`) }, null, 2));
+await writeFile(target, JSON.stringify({ name, description: `Agent Token Viewer ${browser} Launcher`, path: launcher, type: 'stdio', allowed_origins: [...ids].map(id => `chrome-extension://${id}/`) }, null, 2));
 execFileSync('reg.exe', ['add', registry, '/ve', '/t', 'REG_SZ', '/d', target, '/f'], { stdio: 'pipe', windowsHide: true });
-console.log(`Edge用の起動登録が完了しました。拡張ID: ${[...ids].join(', ')}`);
-console.log('edge://extensions で拡張を再読み込みし、アイコンをクリックしてください。');
+console.log(`${browser}用の起動登録が完了しました。拡張ID: ${[...ids].join(', ')}`);
+console.log(`${browser.toLowerCase()}://extensions で拡張を再読み込みし、アイコンをクリックしてください。`);
