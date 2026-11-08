@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Agent Token Viewer — Local Bridge",
-  "version": "0.3.0",
+  "version": "0.9.0",
   "description": "ログイン済みのCodex・Cursor・Claudeから利用状況のみをこのPCのメーターへ送ります。",
   "permissions": [
     "alarms",
