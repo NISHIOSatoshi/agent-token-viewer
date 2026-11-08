@@ -73,3 +73,4 @@
 /* リングはタイルの右端に置く。テキストは左列、リングは右列で2行分 */
 #services .meter .reset .ring{grid-column:2}
 #services .meter .reset>:not(.ring){grid-column:1}
+.card-head{cursor:grab}.card-head:active{cursor:grabbing}.card.dragging{opacity:.45}.card.drop-target{border-color:#8fb4e8;box-shadow:0 0 0 2px #8fb4e8}:root:not([data-theme=dark]) .card.drop-target{border-color:#2f64b0;box-shadow:0 0 0 2px #2f64b0}

@@ -13,8 +13,10 @@ const STARTUP_SYNC_MS = 30_000; // 起動直後に更新中表示を続ける最
 const pageOpenedAt = Date.now();
 const MODE_KEY = 'agent-viewer-display-mode';
 const THEME_KEY = 'agent-viewer-theme';
+const ORDER_KEY = 'agent-viewer-card-order';
 const viewerId =crypto.randomUUID();
 let setup, current, bridgeConnected = false, manualRefreshing = false;
+let draggingId = null, pendingRender = false; // ドラッグ中は再描画を保留する
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
 // 「11/8(日) 19:29」の形式。曜日は1文字。
 const date = value => {
@@ -88,11 +90,38 @@ function toggleMode() {
   showUsed = !showUsed; try { localStorage.setItem(MODE_KEY, showUsed ? 'used' : 'remaining'); } catch {}
   updateModeButton(); if (current) render(current);
 }
+// カードの並び順（サービスIDの配列）。壊れた値は既定順として扱う。
+let cardOrder = (() => { try { const v = JSON.parse(localStorage.getItem(ORDER_KEY)); return Array.isArray(v) ? v : []; } catch { return []; } })();
+// 保存順に並べ、保存にないサービスは既定順のまま末尾に置く。
+const applyOrder = services => {
+  const rank = id => { const i = cardOrder.indexOf(id); return i < 0 ? Infinity : i; };
+  return services.map((service, index) => ({ service, index })).sort((a, b) => rank(a.service.id) - rank(b.service.id) || a.index - b.index).map(item => item.service);
+};
+function endDrag() {
+  draggingId = null;
+  document.querySelectorAll('.card.dragging, .card.drop-target').forEach(node => node.classList.remove('dragging', 'drop-target'));
+  if (pendingRender && current) { pendingRender = false; render(current); }
+}
+// ドロップ先のカードの位置へ、ドラッグ元のカードを移動して保存する。
+function moveCard(fromId, toId) {
+  if (!current || fromId === toId) return;
+  const ids = applyOrder(current.services).map(service => service.id);
+  const from = ids.indexOf(fromId); const to = ids.indexOf(toId);
+  if (from < 0 || to < 0) return;
+  ids.splice(to, 0, ids.splice(from, 1)[0]); cardOrder = ids;
+  try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); } catch {}
+}
 function render(data) {
+  if (draggingId) { pendingRender = true; return; }
   const container = document.querySelector('#services'); container.replaceChildren();
-  for (const service of data.services) {
-    const info = SERVICES[service.id]; const card = el('article', `card ${info.className}`);
-    const head = el('div', 'card-head'); const brand = el('div', 'brand'); brand.append(iconNode(info.icon), el('h2', '', info.name));
+  for (const service of applyOrder(data.services)) {
+    const info = SERVICES[service.id]; const card = el('article', `card ${info.className}`); card.dataset.id = service.id;
+    const head = el('div', 'card-head'); head.draggable = true; head.title = 'ドラッグして並べ替え';
+    head.addEventListener('dragstart', event => { draggingId = service.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', service.id); event.dataTransfer.setDragImage(card, 24, 24); card.classList.add('dragging'); });
+    head.addEventListener('dragend', endDrag);
+    card.addEventListener('dragover', event => { if (!draggingId || draggingId === service.id) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drop-target'); });
+    card.addEventListener('dragleave', event => { if (!card.contains(event.relatedTarget)) card.classList.remove('drop-target'); });
+    card.addEventListener('drop', event => { event.preventDefault(); const from = draggingId; draggingId = null; pendingRender = true; moveCard(from, service.id); endDrag(); }); const brand = el('div', 'brand'); brand.append(iconNode(info.icon), el('h2', '', info.name));
     head.append(brand, el('span', 'plan', service.plan ?? '—')); card.append(head);
     const stale = !service.updatedAt || service.stale || Date.now() - Date.parse(service.updatedAt) > 360_000;
     const syncing = isSyncing(service);
