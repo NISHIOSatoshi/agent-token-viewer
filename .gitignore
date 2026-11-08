@@ -2,5 +2,3 @@
 node_modules/
 .playwright-mcp/
 *.log
-*.png
-!assets/screenshot.png
