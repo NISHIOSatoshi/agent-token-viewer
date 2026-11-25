@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
+    "build": "npm run check && npm test && node scripts/build.mjs",
     "test": "node --test",
     "version:check": "node scripts/version.mjs --check",
     "version:set": "node scripts/version.mjs",
