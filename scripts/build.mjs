@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, rename, rm } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,9 @@ try {
     await mkdir(path.dirname(target), { recursive: true });
     await copyFile(path.join(root, file), target);
   }
+  // README用の画像はリポジトリに保持し、画像を含まない配布物では参照も省略する。
+  const readme = await readFile(path.join(staged, 'README.md'), 'utf8');
+  await writeFile(path.join(staged, 'README.md'), readme.replace(/^!\[画面サンプル\]\(assets\/screenshot\.png\)\r?\n\r?\n/m, ''));
   const temporaryZip = path.join(temporary, `${name}.zip`);
   execFileSync('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-Command',

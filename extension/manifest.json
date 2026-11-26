@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Agent Token Viewer",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "ログイン済みのCodex・Claude・Cursorの利用枠を、このブラウザー内のメーターで確認します。",
   "permissions": [
     "alarms",

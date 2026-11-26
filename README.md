@@ -2,6 +2,8 @@
 
 Codex・Claude・Cursorの利用枠を、ブラウザーの専用タブで確認するManifest V3拡張です。
 
+![画面サンプル](assets/screenshot.png)
+
 ## 導入
 
 利用者向けの手順・更新・1.xからの移行・削除方法は [USER_GUIDE.md](USER_GUIDE.md) を参照してください。
