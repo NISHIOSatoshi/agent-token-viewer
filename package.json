@@ -1,15 +1,15 @@
 {
   "name": "agent-token-viewer",
-  "version": "1.1.0",
+  "version": "2.0.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs",
-    "build": "npm run check && npm test && node scripts/build.mjs",
     "test": "node --test",
+    "build": "npm run check && npm test && node scripts/build.mjs",
     "version:check": "node scripts/version.mjs --check",
     "version:set": "node scripts/version.mjs",
-    "check": "npm run version:check && node --check server.mjs && node --check lib/usage.mjs && node --check public/app.js && node --check extension/background.js && node --check extension/pair.js && node --check scripts/claude-hook.mjs && node --check scripts/native-host.mjs && node --check scripts/register-edge.mjs && node --check lib/viewers.mjs && node --check lib/native-protocol.mjs && node --check extension/setup.js"
+    "check": "npm run version:check && node scripts/check.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -75,17 +75,17 @@ export function normalizeCursor(data) {
   return { plan: data.membershipType ?? null, meters, note: demand?.enabled ? '追加の従量課金が有効です。上限到達後も課金して継続する場合があります。' : null };
 }
 
-export function normalizeClaude(data, source = 'web') {
-  const values = source === 'statusline' ? data.rate_limits : data;
+export function normalizeClaude(data) {
+  const values = data;
   if (!values || typeof values !== 'object') throw new Error('Claudeの利用枠がまだ届いていません。');
   const labels = { five_hour: '5時間枠', seven_day: '週間枠', seven_day_sonnet: 'Sonnet · 週間枠', seven_day_opus: 'Opus · 週間枠' };
   const meters = Object.entries(labels).filter(([key]) => values[key] != null).map(([key, label]) => {
     const window = values[key];
-    return meter(key, label, source === 'statusline' ? window.used_percentage : window.utilization, window.resets_at, { windowMinutes: key === 'five_hour' ? FIVE_HOUR_MINUTES : WEEK_MINUTES });
+    return meter(key, label, window.utilization, window.resets_at, { windowMinutes: key === 'five_hour' ? FIVE_HOUR_MINUTES : WEEK_MINUTES });
   });
-  // プラン名はWeb取得時のみ届く。公式statusLineの出力には含まれない。
-  const plan = source !== 'statusline' && typeof data.plan === 'string' ? data.plan.replace(/^claude_/, '') : null;
-  return { plan, meters, note: source === 'statusline' ? 'Claude Codeから受信。未使用中は更新されません。' : null };
+  // プラン名はWeb応答の接頭辞を取り除いて表示する。
+  const plan = typeof data.plan === 'string' ? data.plan.replace(/^claude_/, '') : null;
+  return { plan, meters, note: null };
 }
 
 export function present(record, now = Date.now()) {

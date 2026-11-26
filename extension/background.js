@@ -1,12 +1,16 @@
-const LOCAL = 'http://127.0.0.1:4317';
+import { normalizeCodex, normalizeClaude, normalizeCursor } from './lib/usage.js';
+import { readState, saveSuccess, saveFailure } from './lib/state.js';
+
+const METER_URL = chrome.runtime.getURL('meter/index.html');
 const INTERVAL_MINUTES = 3;
 const SAND_URL = 'https://cursor.com/api/dashboard/get-sand-usage-status';
 const SAND_ORIGIN_RULE_ID = 1;
-let running;
-let hostPort, hostReady, controller;
-const HOST = 'com.agent_token_viewer.edge';
-const meterTabs = () => chrome.tabs.query({ url: `${LOCAL}/*` });
-const signal = ms => controller ? AbortSignal.any([controller.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms);
+let running = null, controller = null, refreshing = false;
+let lifecycle = Promise.resolve();
+const meterTabs = async () => (await chrome.tabs.query({})).filter(tab => tab.url?.split(/[?#]/)[0] === METER_URL && !tab.discarded);
+const signal = ms => AbortSignal.any([controller?.signal ?? new AbortController().signal, AbortSignal.timeout(ms)]);
+const report = error => console.error('Agent Token Viewer:', error.message);
+const background = promise => { void promise.catch(report); };
 async function ensureSandOriginRule() {
   // POSTのCSRF検査用。service worker由来だけ Origin/Referer を cursor.com に書き換える。
   await chrome.declarativeNetRequest.updateSessionRules({
@@ -90,7 +94,7 @@ async function claude() {
   if (!found.length) throw new Error('Claudeの利用枠がありません。ログインと契約を確認してください。');
   return found[0];
 }
-// Webセッションで取得できる場合のみ利用する。認証情報はローカルへ送らない。
+// Webセッションで取得できる場合のみ利用する。認証情報は保存せず、画面にも渡さない。
 async function codex() {
   const session = await json('https://chatgpt.com/api/auth/session');
   if (typeof session.accessToken !== 'string' || !session.accessToken) throw new Error('ChatGPTのWebセッションを確認できません。拡張を入れたブラウザーでログインしてください。');
@@ -105,91 +109,97 @@ async function codex() {
   if (!limits || ![limits.primary_window, limits.secondary_window].some(w => typeof w?.used_percent === 'number' && Number.isFinite(w.used_percent))) throw new Error('CodexのWeb利用枠を確認できません。ChatGPTのログインとプランを確認してください。');
   return { rateLimits: { planType: typeof data.plan_type === 'string' ? data.plan_type : null, primary: convert(limits.primary_window), secondary: convert(limits.secondary_window) } };
 }
-async function post(token, payload) {
-  const r = await fetch(`${LOCAL}/api/ingest`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000) });
-  if (!r.ok) throw new Error('ローカルメーターに接続できません。ページを開き直してください。');
-}
+
+// 1回の取得を共有する。中断後の処理が次の取得のcontrollerを参照しないよう完了まで保持する。
 function collect() {
   if (running) return running;
+  const currentController = new AbortController();
+  controller = currentController;
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; currentController.abort(); }, 60000);
   running = (async () => {
     if (!(await meterTabs()).length) return;
-    const { token } = await chrome.storage.local.get('token');
-    if (!token) return;
-    try { const health = await fetch(`${LOCAL}/api/state`, { signal: AbortSignal.timeout(3000) }); if (!health.ok || !(await health.json()).active) return; } catch { return; }
-    controller = new AbortController();
-    await Promise.allSettled([['cursor', cursor], ['claude', claude], ['codex', codex]].map(async ([service, read]) => {
-      let payload;
-      try { payload = { service, data: await read() }; }
-      catch (error) { payload = { service, error: error.message }; }
-      if (!controller.signal.aborted && (await meterTabs()).length) await post(token, payload);
+    refreshing = true;
+    await chrome.storage.local.set({ collection: { active: true, startedAt: Date.now() } });
+    await Promise.allSettled([
+      ['cursor', cursor, normalizeCursor], ['claude', claude, normalizeClaude], ['codex', codex, normalizeCodex],
+    ].map(async ([id, read, normalize]) => {
+      try {
+        const data = await read();
+        const normal = normalize(data);
+        if (!normal.meters.length || normal.meters.every(m => m.usedPercent == null)) throw new Error('有効な利用枠がありません。ログインと契約を確認してください。');
+        if (!currentController.signal.aborted && (await meterTabs()).length) await saveSuccess(id, normal);
+      } catch (error) {
+        if ((!currentController.signal.aborted || timedOut) && (await meterTabs()).length) await saveFailure(id, timedOut ? '取得がタイムアウトしました。更新を押して再試行してください。' : error.message);
+      }
     }));
-  })().finally(() => { running = null; controller = null; });
+  })().finally(async () => {
+    clearTimeout(timeout);
+    controller = null;
+    // 完了通知の保存中もrunningを保持し、古い完了処理による新しい取得状態の上書きを防ぐ。
+    refreshing = false;
+    try { await chrome.storage.local.set({ collection: { active: false } }); }
+    finally { running = null; }
+  });
   return running;
 }
-chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (!sender.url?.startsWith(`${LOCAL}/`)) return false;
-  if (message.type === 'pair' && typeof message.token === 'string' && /^[a-f0-9]{64}$/.test(message.token)) {
-    chrome.storage.local.set({ token: message.token }).then(() => { reply({ ok: true }); schedule(); void collect(); });
-    return true;
+async function reconcile(refresh = false) {
+  if (!(await meterTabs()).length) {
+    controller?.abort();
+    await chrome.alarms.clear('usage');
+    return;
   }
-  if (message.type === 'refresh') { void collect(); reply({ ok: true }); }
-  return false;
+  if (!(await chrome.alarms.get('usage'))) await chrome.alarms.create('usage', { periodInMinutes: INTERVAL_MINUTES });
+  if (refresh) {
+    // 全タブを閉じた直後の再オープンでは、古い中断処理が終わってから取得する。
+    if (controller?.signal.aborted && running) await running;
+    background(collect());
+  }
+}
+function syncTabs(refresh = false) {
+  const task = lifecycle.then(() => reconcile(refresh));
+  lifecycle = task.catch(report);
+  return task;
+}
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  if (sender.id !== chrome.runtime.id || sender.url?.split(/[?#]/)[0] !== METER_URL) return false;
+  const handle = async () => {
+    if (message?.type === 'state') return { ok: true, ...(await readState()), refreshing };
+    if (message?.type === 'open' || message?.type === 'refresh') {
+      await syncTabs(true);
+      return { ok: true };
+    }
+    return { ok: false, error: '不明な操作です。' };
+  };
+  handle().then(reply, error => reply({ ok: false, error: error.message }));
+  return true;
 });
-function schedule() { chrome.alarms.create('usage', { periodInMinutes: INTERVAL_MINUTES }); }
-function ensureHost() {
-  if (hostReady) return hostReady;
-  hostReady = new Promise((resolve, reject) => {
-    let completed = false;
-    const timer = setTimeout(() => fail('起動がタイムアウトしました。ブラウザーの初回登録を確認してください。'), 15000);
-    const fail = error => {
-      if (completed) return;
-      completed = true; clearTimeout(timer); hostReady = null;
-      hostPort?.disconnect(); hostPort = null;
-      reject(new Error(error));
-    };
-    try {
-      hostPort = chrome.runtime.connectNative(HOST);
-      hostPort.onMessage.addListener(message => {
-        if (message.type === 'error') return fail(message.error);
-        if (message.type !== 'ready' || completed) return;
-        if (!/^[a-f0-9]{64}$/.test(message.token)) return fail('起動用プログラムの応答が不正です。');
-        completed = true; clearTimeout(timer);
-        chrome.storage.local.set({ token: message.token }).then(() => resolve(message.url), reject);
-      });
-      hostPort.onDisconnect.addListener(() => {
-        const error = chrome.runtime.lastError?.message;
-        hostPort = null; hostReady = null;
-        if (!completed) fail(error ?? '起動用プログラムに接続できません。初回登録を確認してください。');
-      });
-      hostPort.postMessage({ type: 'start' });
-    } catch (error) { fail(error.message); }
-  });
-  return hostReady;
-}
-async function stopIfClosed() {
-  if ((await meterTabs()).length) return;
-  controller?.abort();
-  await chrome.alarms.clear('usage');
-  hostPort?.disconnect(); hostPort = null; hostReady = null;
-}
-chrome.runtime.onInstalled.addListener(() => { void chrome.alarms.clear('usage'); });
-chrome.runtime.onStartup.addListener(() => { void chrome.alarms.clear('usage'); });
-chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'usage') void collect(); });
-chrome.tabs.onRemoved.addListener(() => { void stopIfClosed(); });
-chrome.tabs.onUpdated.addListener((_id, change) => { if (change.url) void stopIfClosed(); });
-chrome.action.onClicked.addListener(async () => {
-  try {
-    await ensureHost();
-    const tabs = await meterTabs();
+chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'usage') background(syncTabs(true)); });
+chrome.tabs.onRemoved.addListener(() => { background(syncTabs()); });
+chrome.tabs.onUpdated.addListener((_id, change, tab) => {
+  if (change.url || change.discarded !== undefined || change.status === 'complete') {
+    const isMeter = tab.url?.split(/[?#]/)[0] === METER_URL;
+    background(syncTabs(isMeter && (change.discarded === false || change.status === 'complete')));
+  }
+});
+chrome.runtime.onInstalled.addListener(() => { background(syncTabs(true)); });
+chrome.runtime.onStartup.addListener(() => { background(syncTabs(true)); });
+// アイコンの連打でもタブが重複しないよう直列化する。
+let opening = Promise.resolve();
+chrome.action.onClicked.addListener(() => {
+  opening = opening.then(async () => {
+    const tabs = (await chrome.tabs.query({})).filter(tab => tab.url?.split(/[?#]/)[0] === METER_URL);
     if (tabs.length) {
       await chrome.tabs.update(tabs[0].id, { active: true });
       await chrome.windows.update(tabs[0].windowId, { focused: true });
-      await chrome.tabs.reload(tabs[0].id);
-    } else await chrome.tabs.create({ url: LOCAL });
-    await chrome.action.setBadgeText({ text: '' });
-  } catch (error) {
-    await chrome.storage.local.set({ launchError: error.message });
-    await chrome.action.setBadgeText({ text: '!' });
-    await chrome.tabs.create({ url: chrome.runtime.getURL('setup.html') });
-  }
+    } else await chrome.tabs.create({ url: METER_URL });
+    await syncTabs(true);
+  }).catch(report);
 });
+// 通常のWorker復帰ではアラームだけ復元し、他サイトのタブ更新を取得の契機にしない。
+// 前回の取得がWorker終了で途切れた場合は、開いたメーターで取得をやり直す。
+async function recover() {
+  const { collection } = await chrome.storage.local.get('collection');
+  await syncTabs(Boolean(collection?.active && !running));
+}
+background(recover());

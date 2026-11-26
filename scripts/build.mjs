@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,14 +10,10 @@ const manifest = JSON.parse(await readFile(path.join(root, 'extension/manifest.j
 if (!/^\d+\.\d+\.\d+$/.test(pkg.version) || pkg.version !== manifest.version) throw new Error('アプリと拡張のバージョンを確認してください。');
 // 明示したファイルだけを収録し、ローカルの保存データや認証情報を含めない。
 const files = [
-  'package.json', 'README.md', 'USER_GUIDE.md', 'CHANGELOG.md', 'assets/screenshot.png',
-  'server.mjs', 'start.cmd', 'install-edge.cmd', 'install-chrome.cmd',
-  'uninstall-edge.cmd', 'uninstall-chrome.cmd',
-  'lib/usage.mjs', 'lib/viewers.mjs', 'lib/native-protocol.mjs',
-  'public/index.html', 'public/app.js', 'public/style.css',
-  'extension/manifest.json', 'extension/background.js', 'extension/pair.js',
-  'extension/setup.html', 'extension/setup.js',
-  'scripts/register-edge.mjs', 'scripts/native-host.mjs', 'scripts/claude-hook.mjs',
+  'README.md', 'USER_GUIDE.md', 'CHANGELOG.md',
+  'extension/manifest.json', 'extension/background.js',
+  'extension/lib/usage.js', 'extension/lib/state.js',
+  'extension/meter/index.html', 'extension/meter/app.js', 'extension/meter/style.css',
 ];
 const dist = path.join(root, 'dist');
 await mkdir(dist, { recursive: true });
@@ -31,8 +27,6 @@ try {
     await mkdir(path.dirname(target), { recursive: true });
     await copyFile(path.join(root, file), target);
   }
-  // 配布物には開発用スクリプトやテストを含めないため、利用可能な起動コマンドだけを残す。
-  await writeFile(path.join(staged, 'package.json'), JSON.stringify({ ...pkg, scripts: { start: pkg.scripts.start } }, null, 2) + '\n');
   const temporaryZip = path.join(temporary, `${name}.zip`);
   execFileSync('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-Command',

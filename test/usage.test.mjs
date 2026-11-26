@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCodex, normalizeClaude, normalizeCursor, present, STALE_MS } from '../lib/usage.mjs';
+import { normalizeCodex, normalizeClaude, normalizeCursor, present, STALE_MS } from '../extension/lib/usage.js';
 test('CursorのCursor ModelsとOther Modelsを分離し、金額の残りゼロと混同しない', () => {
   const data = normalizeCursor({ membershipType: 'pro', billingCycleEnd: '2026-11-07T05:11:40Z', individualUsage: { plan: { enabled: true, limit: 2000, remaining: 0, totalPercentUsed: 29.9365, apiPercentUsed: 62.5778 } } });
   assert.equal(data.meters[0].label, 'Cursor Models');
@@ -65,18 +65,11 @@ test('Codex単一グループはClaudeと同じ枠名にする', () => {
   assert.equal(data.meters[0].label, '5時間枠');
   assert.equal(data.meters[1].label, '週間枠');
 });
-test('Claudeの公式出力とWeb出力が同じ残量になる', () => {
-  const time = 1793686827;
-  const a = normalizeClaude({ rate_limits: { five_hour: { used_percentage: 2, resets_at: time } } }, 'statusline');
-  const b = normalizeClaude({ five_hour: { utilization: 2, resets_at: new Date(time * 1000).toISOString() } });
-  assert.deepEqual(a.meters, b.meters);
-});
-test('Claudeのプラン名はWeb取得時のみ返し、claude_接頭辞を除く', () => {
+test('Claudeのプラン名のclaude_接頭辞を除く', () => {
   const web = normalizeClaude({ plan: 'claude_pro', five_hour: { utilization: 2, resets_at: null } }, 'Web 利用状況');
   assert.equal(web.plan, 'pro');
   assert.equal(web.meters.length, 1);
   assert.equal(normalizeClaude({ five_hour: { utilization: 2, resets_at: null } }).plan, null);
-  assert.equal(normalizeClaude({ plan: 'claude_pro', rate_limits: { five_hour: { used_percentage: 2 } } }, 'statusline').plan, null);
 });
 test('各メーターに経過リング用の窓の長さ（分）を持たせる', () => {
   const claude = normalizeClaude({ five_hour: { utilization: 1, resets_at: '2026-11-08T10:00:00Z' }, seven_day: { utilization: 1, resets_at: '2026-11-10T10:00:00Z' } });
